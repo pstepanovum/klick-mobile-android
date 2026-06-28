@@ -56,7 +56,10 @@ fun ChatScreen(vm: KlicViewModel, conversation: Conversation, onBack: () -> Unit
     var draft by remember { mutableStateOf("") }
     val title = conversation.members.firstOrNull()?.displayName ?: "Chat"
 
-    LaunchedEffect(conversation.id) { vm.openChat(conversation.id) }
+    LaunchedEffect(conversation.id) {
+        vm.openChat(conversation.id)
+        vm.markRead(conversation.id)
+    }
 
     Scaffold(
         containerColor = Background,
@@ -69,10 +72,10 @@ fun ChatScreen(vm: KlicViewModel, conversation: Conversation, onBack: () -> Unit
                     }
                 },
                 actions = {
-                    IconButton(onClick = { vm.startCall(conversation.id, "AUDIO"); onCall("AUDIO") }) {
+                    IconButton(onClick = { vm.startCall(conversation.id, "AUDIO", title); onCall("AUDIO") }) {
                         Icon(Icons.Default.Call, contentDescription = "Voice call")
                     }
-                    IconButton(onClick = { vm.startCall(conversation.id, "VIDEO"); onCall("VIDEO") }) {
+                    IconButton(onClick = { vm.startCall(conversation.id, "VIDEO", title); onCall("VIDEO") }) {
                         Icon(Icons.Default.Videocam, contentDescription = "Video call")
                     }
                 },

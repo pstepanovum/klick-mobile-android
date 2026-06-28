@@ -1,10 +1,12 @@
 package com.klic.app
 
+import android.Manifest
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.padding
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.People
@@ -14,6 +16,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -26,6 +29,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.klic.app.calling.CallInvite
+import com.klic.app.calling.IncomingCallActivity
 import com.klic.app.feature.KlicViewModel
 import com.klic.app.feature.auth.AuthScreen
 import com.klic.app.feature.call.CallScreen
@@ -33,6 +38,7 @@ import com.klic.app.feature.chat.ChatScreen
 import com.klic.app.feature.conversations.ConversationsScreen
 import com.klic.app.feature.friends.FriendsScreen
 import com.klic.app.ui.theme.KlicTheme
+import kotlinx.coroutines.flow.MutableStateFlow
 
 private data class Tab(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
@@ -42,9 +48,22 @@ private val tabs = listOf(
 )
 
 class MainActivity : ComponentActivity() {
+    private val pendingCall = MutableStateFlow<CallInvite?>(null)
+
+    private val permissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {}
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        permissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.POST_NOTIFICATIONS,
+                Manifest.permission.RECORD_AUDIO,
+                Manifest.permission.CAMERA,
+            )
+        )
+        handleIntent(intent)
         val container = (application as KlicApplication).container
 
         setContent {
@@ -56,12 +75,33 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.action == IncomingCallActivity.ACTION_ACCEPT_CALL) {
+            pendingCall.value = CallInvite.fromIntent(intent)
+        }
+    }
+
     @Composable
     private fun Home(vm: KlicViewModel) {
         val navController = rememberNavController()
         val backStack by navController.currentBackStackEntryAsState()
         val route = backStack?.destination?.route
         val showBar = route == "home" || route == "friends"
+
+        // An accepted incoming call → join and show the call screen.
+        val incoming by pendingCall.collectAsState()
+        LaunchedEffect(incoming) {
+            incoming?.let { invite ->
+                vm.acceptIncomingCall(invite.callId, invite.fromName)
+                navController.navigate("call")
+                pendingCall.value = null
+            }
+        }
 
         Scaffold(
             bottomBar = {
@@ -106,7 +146,8 @@ class MainActivity : ComponentActivity() {
                 }
                 composable("call") {
                     val call by vm.activeCall.collectAsState()
-                    call?.let { CallScreen(vm, it, peerName = "Call") { navController.popBackStack() } }
+                    val peer by vm.callPeerName.collectAsState()
+                    call?.let { CallScreen(vm, it, peerName = peer) { navController.popBackStack() } }
                 }
             }
         }

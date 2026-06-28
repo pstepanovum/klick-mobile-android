@@ -48,5 +48,21 @@ The brand set lives in `design/icons/`. For M0, screens use Material icons (mic,
 so they tint cleanly. Run `scripts/generate-icons.sh` to convert the brand SVGs into vector
 drawables (`R.drawable.ic_<variant>_<name>`), then swap the Material icons for them.
 
+## Calling & push (M3)
+- **FCM** delivers incoming-call and message pushes (`calling/KlicMessagingService.kt`).
+- A high-priority **full-screen-intent** notification + `IncomingCallActivity` rings the call over the
+  lock screen (`calling/CallNotifications.kt`, `calling/IncomingCallActivity.kt`).
+- **LiveKit video** is rendered by `calling/CallVideo.kt`.
+
+To make push actually fire:
+1. Create a **Firebase project**, add an Android app with package `com.klic.app`, and replace the
+   placeholder **`app/google-services.json`** with the real one.
+2. Put the Firebase **service-account JSON** on the server and set `FCM_SERVICE_ACCOUNT_PATH` in
+   `klick-server/.env`.
+
+LiveKit room/track APIs in `calling/CallManager.kt` + `CallVideo.kt` target the current SDK — adjust
+if your installed version differs.
+
 ## Roadmap
-M1 auth/profile · M2 messaging + read receipts + FCM push · M3 calling (LiveKit + Telecom ConnectionService).
+Done: M1 auth/friends · M2 read receipts + FCM push · M3 calling (full-screen incoming + LiveKit video).
+Next: Telecom ConnectionService, call history, group calls, typing indicators.

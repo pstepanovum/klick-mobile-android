@@ -27,6 +27,12 @@ class KlicRepository(
         currentUser = null
     }
 
+    suspend fun registerDevice(pushToken: String) {
+        runCatching { api.registerDevice(mapOf("platform" to "ANDROID", "pushToken" to pushToken)) }
+    }
+
+    suspend fun endCall(callId: String) { runCatching { api.endCall(callId) } }
+
     suspend fun friends(): List<User> = api.friends()
     suspend fun friendRequests(): List<FriendRequest> = api.friendRequests()
     suspend fun findUser(username: String): User? = api.findUser(username).firstOrNull()

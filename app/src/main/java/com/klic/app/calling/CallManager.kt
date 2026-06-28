@@ -2,29 +2,43 @@ package com.klic.app.calling
 
 import android.content.Context
 import io.livekit.android.LiveKit
+import io.livekit.android.events.RoomEvent
+import io.livekit.android.events.collect
 import io.livekit.android.room.Room
+import io.livekit.android.room.track.VideoTrack
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 
 /**
- * Wraps a LiveKit room for a 1:1 call and exposes the in-call controls.
- * Media is routed by the LiveKit SFU; this only manages local track state.
+ * Wraps a LiveKit room for a 1:1 call and exposes in-call controls + video tracks.
+ * Media is routed by the LiveKit SFU; this only manages local track state and rendering.
  */
 class CallManager(private val appContext: Context) {
 
     val isConnected = MutableStateFlow(false)
     val micEnabled = MutableStateFlow(true)
     val cameraEnabled = MutableStateFlow(false)
+    val localVideoTrack = MutableStateFlow<VideoTrack?>(null)
+    val remoteVideoTrack = MutableStateFlow<VideoTrack?>(null)
 
-    private var room: Room? = null
+    var room: Room? = null
+        private set
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     suspend fun join(url: String, token: String, video: Boolean) {
         val room = LiveKit.create(appContext).also { this.room = it }
+        scope.launch { room.events.collect { onRoomEvent(it) } }
         room.connect(url, token)
         room.localParticipant.setMicrophoneEnabled(true)
         if (video) room.localParticipant.setCameraEnabled(true)
         isConnected.value = true
         micEnabled.value = true
         cameraEnabled.value = video
+        refreshTracks()
     }
 
     suspend fun toggleMic() {
@@ -37,11 +51,34 @@ class CallManager(private val appContext: Context) {
         val next = !cameraEnabled.value
         room?.localParticipant?.setCameraEnabled(next)
         cameraEnabled.value = next
+        refreshTracks()
     }
 
     fun leave() {
         room?.disconnect()
         room = null
         isConnected.value = false
+        localVideoTrack.value = null
+        remoteVideoTrack.value = null
+    }
+
+    private fun onRoomEvent(event: RoomEvent) {
+        when (event) {
+            is RoomEvent.TrackSubscribed,
+            is RoomEvent.TrackUnsubscribed,
+            is RoomEvent.ParticipantConnected,
+            is RoomEvent.ParticipantDisconnected,
+            is RoomEvent.LocalTrackPublished -> refreshTracks()
+            else -> {}
+        }
+    }
+
+    private fun refreshTracks() {
+        val r = room ?: return
+        localVideoTrack.value = r.localParticipant.videoTrackPublications
+            .firstOrNull()?.second as? VideoTrack
+        remoteVideoTrack.value = r.remoteParticipants.values
+            .flatMap { it.videoTrackPublications }
+            .firstOrNull()?.second as? VideoTrack
     }
 }

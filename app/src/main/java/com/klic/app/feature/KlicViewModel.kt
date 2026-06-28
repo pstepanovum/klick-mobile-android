@@ -11,9 +11,11 @@ import com.klic.app.data.Message
 import com.klic.app.data.TokenStore
 import com.klic.app.data.User
 import com.klic.app.realtime.SocketService
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 class KlicViewModel(
     private val repo: KlicRepository,
@@ -29,6 +31,7 @@ class KlicViewModel(
     val conversations = MutableStateFlow<List<Conversation>>(emptyList())
     val messages = MutableStateFlow<List<Message>>(emptyList())
     val activeCall = MutableStateFlow<CallSession?>(null)
+    val callPeerName = MutableStateFlow("")
 
     val friends = MutableStateFlow<List<User>>(emptyList())
     val friendRequests = MutableStateFlow<List<FriendRequest>>(emptyList())
@@ -111,13 +114,22 @@ class KlicViewModel(
             .onSuccess { messages.value = messages.value + it }
     }
 
-    fun startCall(conversationId: String, kind: String) = viewModelScope.launch {
+    fun startCall(conversationId: String, kind: String, peerName: String) = viewModelScope.launch {
+        callPeerName.value = peerName
         runCatching { repo.startCall(conversationId, kind) }.onSuccess { activeCall.value = it }
     }
 
+    /** Answer an incoming call (from the full-screen notification): fetch a join token. */
+    fun acceptIncomingCall(callId: String, peerName: String) = viewModelScope.launch {
+        callPeerName.value = peerName
+        runCatching { repo.joinToken(callId) }.onSuccess { activeCall.value = it }
+    }
+
     fun endCall() {
+        val id = activeCall.value?.callId
         callManager.leave()
         activeCall.value = null
+        if (id != null) viewModelScope.launch { repo.endCall(id) }
     }
 
     private fun onAuthed() {
@@ -125,6 +137,18 @@ class KlicViewModel(
         currentUser.value = repo.currentUser
         tokenStore.cachedAccess?.let { socket.connect(it) }
         loadConversations()
+        registerPushToken()
+    }
+
+    private fun registerPushToken() {
+        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+            viewModelScope.launch { repo.registerDevice(token) }
+        }
+    }
+
+    /** Emit a read receipt for the open conversation. */
+    fun markRead(conversationId: String) {
+        socket.emit("message:read", buildJsonObject { put("conversationId", conversationId) })
     }
 
     // Wraps a suspend auth call with error handling.

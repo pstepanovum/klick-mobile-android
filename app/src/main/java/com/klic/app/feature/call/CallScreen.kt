@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Mic
@@ -28,7 +29,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import com.klic.app.calling.LiveKitVideo
 import com.klic.app.data.CallSession
 import com.klic.app.feature.KlicViewModel
 import com.klic.app.ui.components.CircleControl
@@ -46,47 +49,63 @@ fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: ()
     val isConnected by manager.isConnected.collectAsState()
     val micEnabled by manager.micEnabled.collectAsState()
     val cameraEnabled by manager.cameraEnabled.collectAsState()
+    val remoteVideo by manager.remoteVideoTrack.collectAsState()
+    val localVideo by manager.localVideoTrack.collectAsState()
+    val isVideo = call.kind == "VIDEO"
 
     LaunchedEffect(call.callId) {
-        manager.join(call.livekitUrl, call.token, video = call.kind == "VIDEO")
+        manager.join(call.livekitUrl, call.token, video = isVideo)
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().background(Background).padding(bottom = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Box(
-            Modifier.size(120.dp).background(SurfaceRaised, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) { Icon(Icons.Default.Person, contentDescription = null, tint = TextMuted) }
-        Spacer(Modifier.height(16.dp))
-        Text(peerName, style = MaterialTheme.typography.titleLarge)
-        Text(
-            if (isConnected) "Connected" else "Calling…",
-            style = MaterialTheme.typography.bodyLarge,
-            color = TextMuted,
-        )
-        Spacer(Modifier.height(48.dp))
+    Box(Modifier.fillMaxSize().background(Background)) {
+        if (isVideo && remoteVideo != null) {
+            LiveKitVideo(manager.room, remoteVideo, Modifier.fillMaxSize())
+        }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
-            CircleControl(
-                icon = if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff,
-                contentDescription = "Toggle microphone",
-            ) { scope.launch { manager.toggleMic() } }
+        Column(
+            Modifier.fillMaxSize().padding(vertical = 56.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (!(isVideo && remoteVideo != null)) {
+                    Box(Modifier.size(120.dp).background(SurfaceRaised, CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = TextMuted)
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+                Text(peerName, style = MaterialTheme.typography.titleLarge)
+                Text(if (isConnected) "Connected" else "Calling…", color = TextMuted)
+            }
 
-            CircleControl(
-                icon = Icons.Default.CallEnd,
-                contentDescription = "End call",
-                fill = Danger,
-                tint = OnPrimary,
-                diameter = 72,
-            ) { vm.endCall(); onEnd() }
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                CircleControl(
+                    icon = if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff,
+                    contentDescription = "Toggle microphone",
+                ) { scope.launch { manager.toggleMic() } }
 
-            CircleControl(
-                icon = if (cameraEnabled) Icons.Default.Videocam else Icons.Default.VideocamOff,
-                contentDescription = "Toggle camera",
-            ) { scope.launch { manager.toggleCamera() } }
+                CircleControl(
+                    icon = Icons.Default.CallEnd,
+                    contentDescription = "End call",
+                    fill = Danger,
+                    tint = OnPrimary,
+                    diameter = 72,
+                ) { vm.endCall(); onEnd() }
+
+                CircleControl(
+                    icon = if (cameraEnabled) Icons.Default.Videocam else Icons.Default.VideocamOff,
+                    contentDescription = "Toggle camera",
+                ) { scope.launch { manager.toggleCamera() } }
+            }
+        }
+
+        // Local camera preview (picture-in-picture)
+        if (isVideo && cameraEnabled && localVideo != null) {
+            LiveKitVideo(
+                manager.room, localVideo,
+                Modifier.padding(20.dp).size(110.dp, 160.dp).clip(RoundedCornerShape(18.dp))
+                    .align(Alignment.TopEnd),
+            )
         }
     }
 }

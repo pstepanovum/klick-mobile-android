@@ -32,6 +32,12 @@ interface KlicApi {
     @POST("conversations/{id}/messages")
     suspend fun send(@Path("id") id: String, @Body body: SendMessageRequest): Message
 
+    @POST("me/devices")
+    suspend fun registerDevice(@Body body: Map<String, String>): Response<ResponseBody>
+
+    @POST("calls/{id}/end")
+    suspend fun endCall(@Path("id") id: String): Response<ResponseBody>
+
     @GET("users")
     suspend fun findUser(@Query("username") username: String): List<User>
 

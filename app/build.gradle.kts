@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -56,4 +57,8 @@ dependencies {
     // Realtime + media
     implementation(libs.socketio.client)
     implementation(libs.livekit.android)
+
+    // Push (FCM)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 }

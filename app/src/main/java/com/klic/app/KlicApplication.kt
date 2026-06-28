@@ -2,6 +2,7 @@ package com.klic.app
 
 import android.app.Application
 import com.klic.app.calling.CallManager
+import com.klic.app.calling.CallNotifications
 import com.klic.app.data.KlicRepository
 import com.klic.app.data.Network
 import com.klic.app.data.TokenStore
@@ -15,6 +16,7 @@ class KlicApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        CallNotifications.createChannels(this)
     }
 }
 
