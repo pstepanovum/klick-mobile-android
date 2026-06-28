@@ -12,7 +12,7 @@ import kotlinx.serialization.json.JsonObject
 import org.json.JSONObject
 import java.time.Instant
 
-/** Socket.io client mirroring klick-server/src/realtime/events.ts. */
+/** Socket.io client mirroring klic-server/src/realtime/events.ts. */
 class SocketService {
     private var socket: Socket? = null
     private var myUserId: String? = null
