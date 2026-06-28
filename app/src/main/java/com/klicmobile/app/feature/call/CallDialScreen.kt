@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.klicmobile.app.data.RecentCall
 import com.klicmobile.app.data.User
 import com.klicmobile.app.feature.KlicViewModel
+import com.klicmobile.app.ui.components.AvatarView
 import com.klicmobile.app.ui.components.KlicSearchBar
 import com.klicmobile.app.ui.theme.KlicIcons
 import java.time.Duration
@@ -120,17 +120,7 @@ private fun FriendCallRow(friend: User, onAudioCall: () -> Unit, onVideoCall: ()
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier.size(50.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                painter = painterResource(KlicIcons.user),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp),
-            )
-        }
+        AvatarView(url = friend.avatarUrl, name = friend.displayName, size = 50.dp)
         Column(Modifier.weight(1f).padding(start = 14.dp)) {
             Text(friend.displayName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             Text("@${friend.username}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -171,17 +161,7 @@ private fun RecentCallRow(call: RecentCall, onCallBack: () -> Unit) {
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier.size(50.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                painter = painterResource(KlicIcons.user),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp),
-            )
-        }
+        AvatarView(url = call.peer?.avatarUrl, name = call.peer?.displayName ?: "?", size = 50.dp)
         Column(Modifier.weight(1f).padding(start = 14.dp)) {
             Text(
                 call.peer?.displayName ?: "Unknown",

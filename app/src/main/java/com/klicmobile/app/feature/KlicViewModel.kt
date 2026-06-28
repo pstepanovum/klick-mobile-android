@@ -38,6 +38,12 @@ class KlicViewModel(
     val conversations = MutableStateFlow<List<Conversation>>(emptyList())
     val messages = MutableStateFlow<List<Message>>(emptyList())
     val presence = socket.presence   // userId -> online / last-seen
+    val typing = socket.typing       // conversationId -> last typing epoch millis
+    /** The message currently being replied to (drives the composer's reply bar). */
+    val replyingTo = MutableStateFlow<Message?>(null)
+    // Locally hidden messages ("delete for me") — session-scoped, filtered from the list.
+    private val hiddenIds = mutableSetOf<String>()
+    private var lastTypingSent = 0L
     val activeCall = MutableStateFlow<CallSession?>(null)
     val callPeerName = MutableStateFlow("")
     val callPeerId = MutableStateFlow<String?>(null)
@@ -65,7 +71,22 @@ class KlicViewModel(
         }
         viewModelScope.launch {
             socket.incomingMessages.collect { msg ->
-                if (msg.conversationId == openConversationId) messages.value = messages.value + msg
+                // Upsert — the server echoes our own sends back for multi-device sync.
+                if (msg.conversationId == openConversationId) upsertMessage(msg)
+            }
+        }
+        viewModelScope.launch {
+            socket.reactionUpdates.collect { u ->
+                if (u.conversationId == openConversationId) {
+                    messages.value = messages.value.map {
+                        if (it.id == u.messageId) it.copy(reactions = u.reactions) else it
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
+            socket.deletedMessages.collect { u ->
+                if (u.conversationId == openConversationId) markDeletedLocally(u.messageId)
             }
         }
         viewModelScope.launch {
@@ -163,18 +184,69 @@ class KlicViewModel(
 
     fun openChat(conversationId: String) = viewModelScope.launch {
         openConversationId = conversationId
+        replyingTo.value = null
         runCatching { repo.messages(conversationId) }
-            .onSuccess { messages.value = it.reversed() }
+            .onSuccess { messages.value = it.reversed().filterNot { m -> m.id in hiddenIds } }
     }
 
     fun send(conversationId: String, body: String) = viewModelScope.launch {
-        runCatching { repo.send(conversationId, body) }
-            .onSuccess { messages.value = messages.value + it }
+        val replyId = replyingTo.value?.id
+        replyingTo.value = null
+        runCatching { repo.send(conversationId, body, replyId) }
+            .onSuccess { upsertMessage(it) }
     }
 
     fun sendSticker(conversationId: String, stickerId: String) = viewModelScope.launch {
-        runCatching { repo.sendSticker(conversationId, stickerId) }
-            .onSuccess { messages.value = messages.value + it }
+        val replyId = replyingTo.value?.id
+        replyingTo.value = null
+        runCatching { repo.sendSticker(conversationId, stickerId, replyId) }
+            .onSuccess { upsertMessage(it) }
+    }
+
+    fun setReplyTo(message: Message?) { replyingTo.value = message }
+
+    /** Throttled typing signal — re-sent at most every 2s while typing, cleared on stop. */
+    fun setTyping(conversationId: String, isTyping: Boolean) {
+        if (isTyping) {
+            val now = System.currentTimeMillis()
+            if (now - lastTypingSent < 2000) return
+            lastTypingSent = now
+            socket.emit("typing", buildJsonObject { put("conversationId", conversationId); put("isTyping", true) })
+        } else {
+            lastTypingSent = 0L
+            socket.emit("typing", buildJsonObject { put("conversationId", conversationId); put("isTyping", false) })
+        }
+    }
+
+    fun react(conversationId: String, messageId: String, emoji: String) = viewModelScope.launch {
+        runCatching { repo.react(conversationId, messageId, emoji) }
+            .onSuccess { updated ->
+                messages.value = messages.value.map { if (it.id == messageId) it.copy(reactions = updated) else it }
+            }
+    }
+
+    fun deleteForMe(message: Message) {
+        hiddenIds += message.id
+        messages.value = messages.value.filterNot { it.id == message.id }
+    }
+
+    fun deleteForEveryone(conversationId: String, messageId: String) = viewModelScope.launch {
+        repo.deleteForEveryone(conversationId, messageId)
+        markDeletedLocally(messageId)
+    }
+
+    private fun markDeletedLocally(messageId: String) {
+        val now = Instant.now().toString()
+        messages.value = messages.value.map {
+            if (it.id == messageId) it.copy(deletedAt = now, reactions = emptyList(), attachments = emptyList())
+            else it
+        }
+    }
+
+    private fun upsertMessage(m: Message) {
+        if (m.id in hiddenIds) return
+        val list = messages.value
+        messages.value = if (list.any { it.id == m.id }) list.map { if (it.id == m.id) m else it } else list + m
     }
 
     fun loadRecentCalls() = viewModelScope.launch {
@@ -188,8 +260,9 @@ class KlicViewModel(
 
     fun sendVoice(conversationId: String, bytes: ByteArray, durationMs: Int, waveform: ByteArray) =
         viewModelScope.launch {
+            replyingTo.value = null
             runCatching { repo.uploadVoice(conversationId, bytes, durationMs, waveform) }
-                .onSuccess { messages.value = messages.value + it }
+                .onSuccess { upsertMessage(it) }
         }
 
     fun startCall(conversationId: String, kind: String, peerName: String) = viewModelScope.launch {
@@ -207,38 +280,45 @@ class KlicViewModel(
     fun acceptIncomingCall(callId: String, peerName: String) = viewModelScope.launch {
         callPeerName.value = peerName
         callStatus.value = "Connecting..."
-        runCatching { repo.joinToken(callId) }
-            .onSuccess { startActiveCall(it, peerName, outgoing = false) }
-            .onFailure {
-                socket.emit("call:decline", buildJsonObject { put("callId", callId) })
-                callStatus.value = "Call failed"
-                finishCall(delayMs = 1200)
-            }
+        val result = runCatching { repo.joinToken(callId) }
+        result.onSuccess { startActiveCall(it, peerName, outgoing = false) }
+        if (result.isFailure) {
+            repo.failCall(callId)
+            callStatus.value = "Call failed"
+            finishCall(delayMs = 1200)
+        }
     }
 
     fun endCall() {
         val id = activeCall.value?.callId
         if (id != null) {
-            socket.emit(
-                if (callStatus.value == "Connected") "call:end" else "call:cancel",
-                buildJsonObject { put("callId", id) },
-            )
-            viewModelScope.launch { repo.endCall(id) }
+            val wasConnected = callStatus.value == "Connected"
+            val wasOutgoing = activeCallOutgoing
+            viewModelScope.launch {
+                when {
+                    wasConnected -> repo.endCall(id)
+                    wasOutgoing -> repo.cancelCall(id)
+                    else -> repo.declineCall(id)
+                }
+            }
         }
         finishCall(callId = id)
     }
 
     fun onCallMediaJoined(callId: String) {
         if (activeCall.value?.callId != callId) return
+        viewModelScope.launch { repo.mediaJoined(callId) }
         if (activeCallOutgoing) return
         callStatus.value = "Connected"
-        socket.emit("call:accept", buildJsonObject { put("callId", callId) })
     }
 
     fun onCallJoinFailed(callId: String) {
         if (activeCall.value?.callId != callId) return
         callStatus.value = "Call failed"
-        socket.emit("call:decline", buildJsonObject { put("callId", callId) })
+        val wasOutgoing = activeCallOutgoing
+        viewModelScope.launch {
+            if (wasOutgoing) repo.cancelCall(callId) else repo.failCall(callId)
+        }
         finishCall(delayMs = 1200, callId = callId)
     }
 
@@ -314,8 +394,7 @@ class KlicViewModel(
             delay(45_000)
             if (activeCall.value?.callId == callId && activeCallOutgoing && callStatus.value == "Calling...") {
                 callStatus.value = "No answer"
-                socket.emit("call:cancel", buildJsonObject { put("callId", callId) })
-                repo.endCall(callId)
+                repo.cancelCall(callId)
                 finishCall(delayMs = 1500, callId = callId)
             }
         }
@@ -336,7 +415,6 @@ class KlicViewModel(
             }
             SocketService.CallEvent.Type.DECLINE -> {
                 callStatus.value = "Busy"
-                viewModelScope.launch { repo.endCall(currentId) }
                 finishCall(delayMs = 1500, callId = currentId)
             }
             SocketService.CallEvent.Type.CANCEL,

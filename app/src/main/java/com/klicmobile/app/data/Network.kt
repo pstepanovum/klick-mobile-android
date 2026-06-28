@@ -12,6 +12,7 @@ import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
@@ -58,6 +59,18 @@ interface KlicApi {
     @POST("me/devices")
     suspend fun registerDevice(@Body body: Map<String, String>): Response<ResponseBody>
 
+    @POST("calls/{id}/media-joined")
+    suspend fun mediaJoined(@Path("id") id: String): Response<ResponseBody>
+
+    @POST("calls/{id}/decline")
+    suspend fun declineCall(@Path("id") id: String): Response<ResponseBody>
+
+    @POST("calls/{id}/cancel")
+    suspend fun cancelCall(@Path("id") id: String): Response<ResponseBody>
+
+    @POST("calls/{id}/fail")
+    suspend fun failCall(@Path("id") id: String): Response<ResponseBody>
+
     @POST("calls/{id}/end")
     suspend fun endCall(@Path("id") id: String): Response<ResponseBody>
 
@@ -93,6 +106,20 @@ interface KlicApi {
 
     @POST("conversations/{id}/messages")
     suspend fun sendSticker(@Path("id") id: String, @Body body: SendStickerRequest): Message
+
+    @POST("conversations/{id}/messages/{messageId}/reactions")
+    suspend fun react(
+        @Path("id") id: String,
+        @Path("messageId") messageId: String,
+        @Body body: ReactionRequest,
+    ): ReactionResponse
+
+    @DELETE("conversations/{id}/messages/{messageId}")
+    suspend fun deleteMessage(
+        @Path("id") id: String,
+        @Path("messageId") messageId: String,
+        @Query("scope") scope: String = "everyone",
+    ): Response<ResponseBody>
 }
 
 /** Bare, synchronous refresh used by the Authenticator (no auth header, no authenticator → no recursion). */

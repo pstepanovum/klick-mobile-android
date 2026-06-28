@@ -34,8 +34,7 @@ import com.klicmobile.app.KlicApplication
 import com.klicmobile.app.MainActivity
 import com.klicmobile.app.ui.theme.KlicIcons
 import com.klicmobile.app.ui.theme.KlicTheme
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.coroutines.launch
 
 class IncomingCallActivity : ComponentActivity() {
 
@@ -99,10 +98,8 @@ class IncomingCallActivity : ComponentActivity() {
     }
 
     private fun decline(invite: CallInvite) {
-        (application as KlicApplication).container.socket.emit(
-            "call:decline",
-            buildJsonObject { put("callId", invite.callId) },
-        )
+        val container = (application as KlicApplication).container
+        container.applicationScope.launch { container.repository.declineCall(invite.callId) }
         CallNotifications.cancelIncomingCall(this)
         finish()
     }

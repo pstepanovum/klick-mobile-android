@@ -10,6 +10,9 @@ import com.klicmobile.app.data.KlicRepository
 import com.klicmobile.app.data.Network
 import com.klicmobile.app.data.TokenStore
 import com.klicmobile.app.realtime.SocketService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -31,6 +34,7 @@ class KlicApplication : Application(), ImageLoaderFactory {
 }
 
 class AppContainer(app: Application) {
+    val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val tokenStore = TokenStore(app)
 
     // Emitted when the server rejects our refresh token (a genuine sign-out).

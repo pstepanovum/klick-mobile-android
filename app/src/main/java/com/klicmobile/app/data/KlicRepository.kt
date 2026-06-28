@@ -93,6 +93,10 @@ class KlicRepository(
     }
 
     suspend fun endCall(callId: String) { runCatching { api.endCall(callId) } }
+    suspend fun mediaJoined(callId: String) { runCatching { api.mediaJoined(callId) } }
+    suspend fun declineCall(callId: String) { runCatching { api.declineCall(callId) } }
+    suspend fun cancelCall(callId: String) { runCatching { api.cancelCall(callId) } }
+    suspend fun failCall(callId: String) { runCatching { api.failCall(callId) } }
 
     suspend fun friends(): List<User> = api.friends()
     suspend fun friendRequests(): List<FriendRequest> = api.friendRequests()
@@ -104,13 +108,20 @@ class KlicRepository(
 
     suspend fun conversations(): List<Conversation> = api.conversations()
     suspend fun messages(conversationId: String): List<Message> = api.messages(conversationId)
-    suspend fun send(conversationId: String, body: String): Message =
-        api.send(conversationId, SendMessageRequest(body))
+    suspend fun send(conversationId: String, body: String, replyToId: String? = null): Message =
+        api.send(conversationId, SendMessageRequest(body, replyToId))
+
+    suspend fun react(conversationId: String, messageId: String, emoji: String): List<Reaction> =
+        api.react(conversationId, messageId, ReactionRequest(emoji)).reactions
+
+    suspend fun deleteForEveryone(conversationId: String, messageId: String) {
+        runCatching { api.deleteMessage(conversationId, messageId, "everyone") }
+    }
 
     suspend fun recentCalls(): List<RecentCall> = api.recentCalls()
     suspend fun stickers(): List<Sticker> = api.stickers().stickers
-    suspend fun sendSticker(conversationId: String, stickerId: String): Message =
-        api.sendSticker(conversationId, SendStickerRequest(stickerId))
+    suspend fun sendSticker(conversationId: String, stickerId: String, replyToId: String? = null): Message =
+        api.sendSticker(conversationId, SendStickerRequest(stickerId, replyToId))
 
     suspend fun uploadVoice(
         conversationId: String,

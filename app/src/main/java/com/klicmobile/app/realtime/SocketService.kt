@@ -1,8 +1,11 @@
 package com.klicmobile.app.realtime
 
+import android.os.Handler
+import android.os.Looper
 import com.klicmobile.app.data.AccessToken
 import com.klicmobile.app.data.Message
 import com.klicmobile.app.data.Network
+import com.klicmobile.app.data.Reaction
 import io.socket.client.IO
 import io.socket.client.Socket
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -25,9 +28,18 @@ class SocketService {
     val presence = MutableStateFlow<Map<String, Presence>>(emptyMap())
     val readReceipts = MutableSharedFlow<Receipt>(extraBufferCapacity = 32)
     val deliveredReceipts = MutableSharedFlow<Receipt>(extraBufferCapacity = 32)
+    /** conversationId → epoch millis the peer last signalled typing (cleared on stop/expiry). */
+    val typing = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val reactionUpdates = MutableSharedFlow<ReactionUpdate>(extraBufferCapacity = 32)
+    val deletedMessages = MutableSharedFlow<DeletedUpdate>(extraBufferCapacity = 16)
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val typingTokens = mutableMapOf<String, Any>()
 
     data class Presence(val online: Boolean, val lastSeenMs: Long? = null)
     data class Receipt(val conversationId: String, val userId: String, val atMs: Long)
+    data class ReactionUpdate(val conversationId: String, val messageId: String, val reactions: List<Reaction>)
+    data class DeletedUpdate(val conversationId: String, val messageId: String)
 
     data class CallInvite(
         val callId: String,
@@ -85,6 +97,47 @@ class SocketService {
                 deliveredReceipts.tryEmit(
                     Receipt(json.optString("conversationId"), json.optString("userId"), at)
                 )
+            }
+        }
+        socket.on("typing") { args ->
+            (args.firstOrNull() as? JSONObject)?.let { json ->
+                val conversationId = json.optString("conversationId").takeIf { it.isNotBlank() } ?: return@let
+                val isTyping = json.optBoolean("isTyping", false)
+                mainHandler.post {
+                    if (isTyping) {
+                        val token = Any()
+                        typingTokens[conversationId] = token
+                        typing.value = typing.value + (conversationId to System.currentTimeMillis())
+                        // Auto-clear if the peer goes quiet without sending a stop.
+                        mainHandler.postDelayed({
+                            if (typingTokens[conversationId] === token) typing.value = typing.value - conversationId
+                        }, 6000)
+                    } else {
+                        typingTokens[conversationId] = Any()
+                        typing.value = typing.value - conversationId
+                    }
+                }
+            }
+        }
+        socket.on("message:reaction") { args ->
+            (args.firstOrNull() as? JSONObject)?.let { json ->
+                val conversationId = json.optString("conversationId").takeIf { it.isNotBlank() } ?: return@let
+                val messageId = json.optString("messageId").takeIf { it.isNotBlank() } ?: return@let
+                val arr = json.optJSONArray("reactions")
+                val reactions = buildList {
+                    if (arr != null) for (i in 0 until arr.length()) {
+                        val r = arr.getJSONObject(i)
+                        add(Reaction(r.optString("emoji"), r.optInt("count"), r.optBoolean("mine", false)))
+                    }
+                }
+                reactionUpdates.tryEmit(ReactionUpdate(conversationId, messageId, reactions))
+            }
+        }
+        socket.on("message:deleted") { args ->
+            (args.firstOrNull() as? JSONObject)?.let { json ->
+                val conversationId = json.optString("conversationId").takeIf { it.isNotBlank() } ?: return@let
+                val messageId = json.optString("messageId").takeIf { it.isNotBlank() } ?: return@let
+                deletedMessages.tryEmit(DeletedUpdate(conversationId, messageId))
             }
         }
         socket.on("call:invite") { args ->

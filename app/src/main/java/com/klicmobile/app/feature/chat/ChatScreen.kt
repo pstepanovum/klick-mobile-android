@@ -15,11 +15,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +48,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -60,15 +64,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
+import coil.compose.AsyncImage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
@@ -113,6 +120,15 @@ fun ChatScreen(
     val stickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val stickers by vm.stickers.collectAsState()
 
+    val typingMap by vm.typing.collectAsState()
+    val replyingTo by vm.replyingTo.collectAsState()
+    val clipboard = LocalClipboardManager.current
+    var menuTarget by remember { mutableStateOf<Message?>(null) }
+    var deleteTarget by remember { mutableStateOf<Message?>(null) }
+    var viewerUrl by remember { mutableStateOf<String?>(null) }
+    val peerTyping = typingMap[conversation.id]?.let { System.currentTimeMillis() - it < 6000L } == true
+    val displaySubtitle = if (peerTyping) "typing…" else headerSubtitle
+
     val recorder = remember { VoiceRecorder(context) }
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) recorder.start()
@@ -133,12 +149,13 @@ fun ChatScreen(
         vm.markRead(conversation.id)
     }
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            scope.launch { listState.animateScrollToItem(messages.size - 1) }
-        }
+    // Magnet to the bottom on every new message and when the peer starts typing.
+    LaunchedEffect(messages.size, peerTyping) {
+        val target = messages.size - 1 + if (peerTyping) 1 else 0
+        if (target >= 0) scope.launch { listState.animateScrollToItem(target) }
     }
 
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -151,11 +168,11 @@ fun ChatScreen(
                         AvatarView(url = peer?.avatarUrl, name = title, size = 34.dp)
                         Column(Modifier.padding(start = 10.dp)) {
                             Text(title, style = MaterialTheme.typography.titleMedium)
-                            if (headerSubtitle != null) {
+                            if (displaySubtitle != null) {
                                 Text(
-                                    headerSubtitle,
+                                    displaySubtitle,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (presenceMap[peer?.id]?.online == true)
+                                    color = if (peerTyping || presenceMap[peer?.id]?.online == true)
                                         MaterialTheme.colorScheme.primary
                                     else MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -210,8 +227,19 @@ fun ChatScreen(
                         isMine  = isMine,
                         isFirst = isFirst,
                         isLast  = isLast,
+                        replyAuthorName = msg.replyTo?.let { if (it.senderId == me?.id) "You" else title } ?: "",
                         onCallBack = { kind -> vm.startCall(conversation.id, kind, title); onCall(kind) },
+                        onLongPress = { menuTarget = msg },
+                        onReactionTap = { emoji -> vm.react(conversation.id, msg.id, emoji) },
+                        onImageClick = { url -> viewerUrl = url },
                     )
+                }
+                if (peerTyping) {
+                    item {
+                        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.Start) {
+                            TypingBubble()
+                        }
+                    }
                 }
             }
 
@@ -226,9 +254,16 @@ fun ChatScreen(
                     },
                 )
             } else {
+                replyingTo?.let { target ->
+                    ReplyComposerBar(
+                        authorName = if (target.senderId == me?.id) "yourself" else title,
+                        preview = messagePreview(target),
+                        onCancel = { vm.setReplyTo(null) },
+                    )
+                }
                 ComposerBar(
                     draft    = draft,
-                    onChange = { draft = it },
+                    onChange = { draft = it; vm.setTyping(conversation.id, it.isNotBlank()) },
                     onSend   = {
                         if (draft.isNotBlank()) { vm.send(conversation.id, draft.trim()); draft = "" }
                     },
@@ -279,6 +314,47 @@ fun ChatScreen(
             }
         }
     }
+
+    // Long-press action menu (reactions + reply/copy/delete).
+    menuTarget?.let { target ->
+        MessageActionsOverlay(
+            message = target,
+            isMine = target.senderId == me?.id,
+            onReact = { emoji -> vm.react(conversation.id, target.id, emoji); menuTarget = null },
+            onReply = { vm.setReplyTo(target); menuTarget = null },
+            onCopy = { clipboard.setText(AnnotatedString(target.body)) },
+            onDelete = { deleteTarget = target },
+            onDismiss = { menuTarget = null },
+        )
+    }
+
+    deleteTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null; menuTarget = null },
+            title = { Text("Delete message") },
+            text = { Text("This can't be undone.") },
+            confirmButton = {
+                Column {
+                    if (target.senderId == me?.id) {
+                        TextButton(onClick = {
+                            vm.deleteForEveryone(conversation.id, target.id); deleteTarget = null; menuTarget = null
+                        }) { Text("Delete for everyone", color = MaterialTheme.colorScheme.error) }
+                    }
+                    TextButton(onClick = {
+                        vm.deleteForMe(target); deleteTarget = null; menuTarget = null
+                    }) { Text("Delete for me", color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null; menuTarget = null }) { Text("Cancel") }
+            },
+        )
+    }
+
+    viewerUrl?.let { url ->
+        ImageViewerOverlay(url = url, onDismiss = { viewerUrl = null })
+    }
+    } // Box
 }
 
 // MARK: - Message bubble
@@ -290,21 +366,31 @@ private fun MessageBubble(
     isMine: Boolean,
     isFirst: Boolean,
     isLast: Boolean,
+    replyAuthorName: String = "",
     onCallBack: (String) -> Unit = {},
+    onLongPress: () -> Unit = {},
+    onReactionTap: (String) -> Unit = {},
+    onImageClick: (String) -> Unit = {},
 ) {
+    if (message.isDeleted) { DeletedBubble(isMine); return }
     if (message.isCallEvent && message.call != null) {
         CallEventBubble(message.call, outgoing = isMine, time = shortTime(message.createdAt), onCallBack = onCallBack)
         return
     }
     if (message.isSticker) {
-        StickerBubble(message, isMine = isMine, time = if (isLast) shortTime(message.createdAt) else null)
+        Column(
+            Modifier.fillMaxWidth().padding(vertical = 1.dp)
+                .combinedClickable(onClick = {}, onLongClick = onLongPress),
+            horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
+        ) {
+            StickerBubble(message, isMine = isMine, time = if (isLast) shortTime(message.createdAt) else null)
+            if (message.reactions.isNotEmpty()) ReactionPillsRow(message.reactions, onReactionTap)
+        }
         return
     }
 
     val tailRadius = 4.dp
     val fullRadius = 18.dp
-    val clipboard = LocalClipboardManager.current
-
     val shape = RoundedCornerShape(
         topStart     = if (!isMine && isFirst) fullRadius else if (!isMine) 4.dp else fullRadius,
         topEnd       = if (isMine  && isFirst) fullRadius else if (isMine)  4.dp else fullRadius,
@@ -312,37 +398,60 @@ private fun MessageBubble(
         bottomStart  = if (!isMine && isLast)  tailRadius else fullRadius,
     )
 
+    val voiceAtt = message.attachments.firstOrNull { it.kind == "VOICE" }
+    val imageAtt = message.attachments.firstOrNull { it.kind == "IMAGE" }
+
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 1.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp),
         horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
     ) {
-        val voiceAtt = message.attachments.firstOrNull { it.kind == "VOICE" }
-        if (voiceAtt != null) {
-            VoiceAttachmentView(att = voiceAtt, isMine = isMine)
-        } else {
-            Box(
-                Modifier
-                    .widthIn(max = 280.dp)
-                    .background(
-                        if (isMine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                        shape,
+        when {
+            voiceAtt != null ->
+                Box(Modifier.combinedClickable(onClick = {}, onLongClick = onLongPress)) {
+                    VoiceAttachmentView(att = voiceAtt, isMine = isMine)
+                }
+            imageAtt != null ->
+                Column(horizontalAlignment = if (isMine) Alignment.End else Alignment.Start) {
+                    message.replyTo?.let { ReplyQuote(it, replyAuthorName) }
+                    AsyncImage(
+                        model = imageAtt.url,
+                        contentDescription = "Image",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .widthIn(max = 240.dp)
+                            .heightIn(max = 320.dp)
+                            .aspectRatio(imageAspect(imageAtt))
+                            .clip(RoundedCornerShape(16.dp))
+                            .combinedClickable(onClick = { onImageClick(imageAtt.url) }, onLongClick = onLongPress),
                     )
-                    .combinedClickable(
-                        onClick = {},
-                        onLongClick = {
-                            if (message.body.isNotBlank()) clipboard.setText(AnnotatedString(message.body))
-                        },
-                    )
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-            ) {
-                Text(
-                    message.body,
-                    color = if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
+                }
+            else ->
+                Box(
+                    Modifier
+                        .widthIn(max = 280.dp)
+                        .background(
+                            if (isMine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            shape,
+                        )
+                        .combinedClickable(onClick = {}, onLongClick = onLongPress)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                ) {
+                    Column {
+                        message.replyTo?.let { ReplyQuote(it, replyAuthorName, onPrimary = isMine) }
+                        if (message.body.isNotBlank()) {
+                            Text(
+                                message.body,
+                                color = if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                    }
+                }
+        }
+
+        if (message.reactions.isNotEmpty()) {
+            Spacer(Modifier.height(2.dp))
+            ReactionPillsRow(message.reactions, onReactionTap)
         }
 
         if (isLast) {
@@ -362,6 +471,23 @@ private fun MessageBubble(
             }
         }
     }
+}
+
+// Aspect ratio for an inline image, clamped so extreme shapes stay reasonable.
+private fun imageAspect(att: Attachment): Float {
+    val w = att.width; val h = att.height
+    return if (w != null && h != null && w > 0 && h > 0) (w.toFloat() / h.toFloat()).coerceIn(0.6f, 1.6f) else 1f
+}
+
+// Compact preview text for the composer's reply bar.
+private fun messagePreview(m: Message): String = when {
+    m.body.isNotBlank() -> m.body
+    m.isSticker -> "Sticker"
+    m.attachments.firstOrNull()?.kind == "IMAGE" -> "📷 Photo"
+    m.attachments.firstOrNull()?.kind == "VOICE" -> "🎤 Voice message"
+    m.attachments.firstOrNull()?.kind == "VIDEO" -> "🎥 Video"
+    m.attachments.isNotEmpty() -> "📎 File"
+    else -> "Message"
 }
 
 @Composable

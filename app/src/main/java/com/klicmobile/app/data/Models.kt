@@ -82,11 +82,26 @@ data class Attachment(
 @Serializable
 data class CallEvent(
     val kind: String,           // "AUDIO" | "VIDEO"
-    val outcome: String,        // "completed" | "missed" | "declined" | "canceled"
+    val outcome: String,        // "completed" | "missed" | "declined" | "canceled" | "failed"
     val durationMs: Int? = null,
 ) {
     val isVideo: Boolean get() = kind == "VIDEO"
 }
+
+@Serializable
+data class Reaction(
+    val emoji: String,
+    val count: Int,
+    val mine: Boolean = false,
+)
+
+@Serializable
+data class ReplyPreview(
+    val id: String,
+    val senderId: String,
+    val kind: String,
+    val preview: String,
+)
 
 @Serializable
 data class Message(
@@ -101,9 +116,13 @@ data class Message(
     val stickerId: String? = null,
     val stickerUrl: String? = null,
     val call: CallEvent? = null,
+    val replyTo: ReplyPreview? = null,
+    val reactions: List<Reaction> = emptyList(),
+    val deletedAt: String? = null,
 ) {
     val isCallEvent: Boolean get() = kind == "CALL_EVENT"
     val isSticker: Boolean get() = kind == "STICKER"
+    val isDeleted: Boolean get() = deletedAt != null
 }
 
 @Serializable
@@ -135,7 +154,13 @@ data class Sticker(val id: String, val url: String)
 data class StickerCatalog(val stickers: List<Sticker> = emptyList())
 
 @Serializable
-data class SendStickerRequest(val stickerId: String)
+data class SendStickerRequest(val stickerId: String, val replyToId: String? = null)
+
+@Serializable
+data class ReactionRequest(val emoji: String)
+
+@Serializable
+data class ReactionResponse(val reactions: List<Reaction> = emptyList())
 
 @Serializable
 data class UploadRequest(
@@ -159,6 +184,7 @@ data class AttachmentInput(
 data class SendWithAttachmentsRequest(
     val body: String? = null,
     val attachments: List<AttachmentInput>,
+    val replyToId: String? = null,
 )
 
 @Serializable
@@ -168,7 +194,7 @@ data class RequestFrom(val id: String, val username: String, val displayName: St
 data class FriendRequest(val requestId: String, val from: RequestFrom)
 
 @Serializable
-data class SendMessageRequest(val body: String)
+data class SendMessageRequest(val body: String, val replyToId: String? = null)
 
 @Serializable
 data class StartCallRequest(val conversationId: String, val kind: String)
