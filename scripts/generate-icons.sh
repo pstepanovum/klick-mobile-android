@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-SRC="/Users/pavelstepanov/Projects/Klic/klick-mobile-ios/design/icons"
+SRC="/Users/pavelstepanov/Projects/Klic/klic-mobile-ios/design/icons"
 OUT="app/src/main/res/drawable"
 mkdir -p "$OUT"
 

@@ -1,6 +1,6 @@
-# klick-mobile-android
+# klic-mobile-android
 
-Native Android client for **Klic** — Kotlin + Jetpack Compose, talking to `klick-server` for auth,
+Native Android client for **Klic** — Kotlin + Jetpack Compose, talking to `klic-server` for auth,
 chat, and call signaling, and to LiveKit for audio/video media.
 
 ## Requirements
@@ -10,7 +10,7 @@ chat, and call signaling, and to LiveKit for audio/video media.
 ## Run
 Open the folder in Android Studio and let Gradle sync, then Run. By default the app targets the
 **live server** `https://api.89.34.230.2.sslip.io` (see `data/Network.kt`). To use a local backend,
-set `BASE_HTTP = "http://10.0.2.2:3000"` (emulator → host) and start `klick-server` first.
+set `BASE_HTTP = "http://10.0.2.2:3000"` (emulator → host) and start `klic-server` first.
 
 CLI: `./gradlew :app:installDebug`
 
@@ -58,7 +58,7 @@ To make push actually fire:
 1. Create a **Firebase project**, add an Android app with package `com.klic.app`, and replace the
    placeholder **`app/google-services.json`** with the real one.
 2. Put the Firebase **service-account JSON** on the server and set `FCM_SERVICE_ACCOUNT_PATH` in
-   `klick-server/.env`.
+   `klic-server/.env`.
 
 LiveKit room/track APIs in `calling/CallManager.kt` + `CallVideo.kt` target the current SDK — adjust
 if your installed version differs.
