@@ -56,4 +56,7 @@ dependencies {
     // Realtime + media
     implementation(libs.socketio.client)
     implementation(libs.livekit.android)
+
+    // Animations
+    implementation(libs.lottie.compose)
 }

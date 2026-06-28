@@ -1,11 +1,15 @@
 package com.klicmobile.app.feature.auth
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -17,7 +21,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.klicmobile.app.R
 import com.klicmobile.app.feature.KlicViewModel
 import com.klicmobile.app.ui.components.KlicTextField
 import com.klicmobile.app.ui.components.PillButton
@@ -30,18 +42,40 @@ fun AuthScreen(vm: KlicViewModel) {
     var password by remember { mutableStateOf("") }
     val error by vm.error.collectAsState()
 
+    val lottieComposition by rememberLottieComposition(LottieCompositionSpec.Asset("animations/12.json"))
+    val lottieProgress by animateLottieCompositionAsState(lottieComposition, iterations = LottieConstants.IterateForever)
+
     Column(
-        modifier = Modifier.fillMaxSize().padding(28.dp),
-        verticalArrangement = Arrangement.Center,
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Klic", style = MaterialTheme.typography.displayLarge)
+        LottieAnimation(
+            composition = lottieComposition,
+            progress = { lottieProgress },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(240.dp)
+                .padding(top = 48.dp),
+        )
+
+        Image(
+            painter = painterResource(R.drawable.ic_klic_logo),
+            contentDescription = "Klic",
+            modifier = Modifier
+                .width(130.dp)
+                .padding(top = 20.dp),
+            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onBackground),
+        )
+
         Text(
             if (isRegistering) "Create your account" else "Welcome back",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 10.dp, bottom = 28.dp),
         )
-        Spacer(Modifier.height(24.dp))
 
         KlicTextField(username, { username = it }, "Username")
         Spacer(Modifier.height(12.dp))
@@ -63,8 +97,11 @@ fun AuthScreen(vm: KlicViewModel) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+
         error?.let {
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
         }
+
+        Spacer(Modifier.height(40.dp))
     }
 }
