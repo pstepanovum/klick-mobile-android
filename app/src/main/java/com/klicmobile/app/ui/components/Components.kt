@@ -1,10 +1,17 @@
 package com.klicmobile.app.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -15,8 +22,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -70,6 +84,73 @@ fun KlicTextField(
             unfocusedTextColor      = MaterialTheme.colorScheme.onSurface,
         ),
     )
+}
+
+/** Checkbox with "I agree to the Privacy Policy" label. */
+@Composable
+fun KlicCheckbox(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    onPrivacyTap: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        val primary = MaterialTheme.colorScheme.primary
+        val onPrimary = MaterialTheme.colorScheme.onPrimary
+        val outline = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+
+        Box(
+            modifier = Modifier
+                .size(22.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(if (checked) primary else Color.Transparent)
+                .border(1.5.dp, if (checked) primary else outline, RoundedCornerShape(6.dp))
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                ) { onCheckedChange(!checked) },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (checked) {
+                androidx.compose.foundation.Canvas(modifier = Modifier.size(13.dp)) {
+                    drawPath(
+                        path = Path().apply {
+                            moveTo(size.width * 0.15f, size.height * 0.52f)
+                            lineTo(size.width * 0.42f, size.height * 0.78f)
+                            lineTo(size.width * 0.85f, size.height * 0.22f)
+                        },
+                        color = onPrimary,
+                        style = Stroke(
+                            width = 2.dp.toPx(),
+                            cap = StrokeCap.Round,
+                            join = StrokeJoin.Round,
+                        ),
+                    )
+                }
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                "I agree to the",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "Privacy Policy",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                ) { onPrivacyTap() },
+            )
+        }
+    }
 }
 
 /** Circular in-call control using a brand Painter icon. */

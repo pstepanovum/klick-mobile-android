@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.klicmobile.app.R
 import com.klicmobile.app.feature.KlicViewModel
+import com.klicmobile.app.ui.components.KlicCheckbox
 import com.klicmobile.app.ui.components.KlicTextField
 import com.klicmobile.app.ui.components.PillButton
 
@@ -47,8 +48,15 @@ fun AuthScreen(vm: KlicViewModel) {
     var username by remember { mutableStateOf("") }
     var displayName by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var agreedToPrivacy by remember { mutableStateOf(false) }
+    var showPrivacyPolicy by remember { mutableStateOf(false) }
     val error by vm.error.collectAsState()
     val focusManager = LocalFocusManager.current
+
+    if (showPrivacyPolicy) {
+        PrivacyPolicyScreen(onBack = { showPrivacyPolicy = false })
+        return
+    }
 
     Box(
         modifier = Modifier
@@ -94,14 +102,31 @@ fun AuthScreen(vm: KlicViewModel) {
                 PasswordStrengthBar(password = password, modifier = Modifier.padding(top = 8.dp))
             }
 
+            AnimatedVisibility(visible = isRegistering) {
+                KlicCheckbox(
+                    checked = agreedToPrivacy,
+                    onCheckedChange = { agreedToPrivacy = it },
+                    onPrivacyTap = { showPrivacyPolicy = true },
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            }
+
             Spacer(Modifier.height(20.dp))
 
-            PillButton(if (isRegistering) "Sign up" else "Log in") {
+            PillButton(
+                text = if (isRegistering) "Sign up" else "Log in",
+                modifier = Modifier.then(
+                    if (isRegistering && !agreedToPrivacy) Modifier.clip(CircleShape) else Modifier
+                ),
+            ) {
                 if (isRegistering) vm.register(username, password, displayName)
                 else vm.login(username, password)
             }
 
-            TextButton(onClick = { isRegistering = !isRegistering }) {
+            TextButton(onClick = {
+                isRegistering = !isRegistering
+                agreedToPrivacy = false
+            }) {
                 Text(
                     if (isRegistering) "I already have an account" else "Create an account",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -129,10 +154,10 @@ private fun passwordStrength(password: String): StrengthLevel {
     val hasDigit   = password.any { it.isDigit() }
     val hasSpecial = password.any { !it.isLetterOrDigit() }
     return when {
-        password.length < 8            -> StrengthLevel(1, "Weak",   Color(0xFFEF5350))
-        !hasUpper && !hasDigit         -> StrengthLevel(2, "Fair",   Color(0xFFFF8C00))
-        hasUpper && hasDigit && hasSpecial -> StrengthLevel(4, "Strong", Color(0xFF2ECC71))
-        else                           -> StrengthLevel(3, "Good",   Color(0xFF8BC34A))
+        password.length < 8                        -> StrengthLevel(1, "Weak",   Color(0xFFEF5350))
+        !hasUpper && !hasDigit                     -> StrengthLevel(2, "Fair",   Color(0xFFFF8C00))
+        hasUpper && hasDigit && hasSpecial         -> StrengthLevel(4, "Strong", Color(0xFF2ECC71))
+        else                                       -> StrengthLevel(3, "Good",   Color(0xFF8BC34A))
     }
 }
 
