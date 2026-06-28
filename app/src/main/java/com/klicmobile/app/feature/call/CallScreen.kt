@@ -36,7 +36,7 @@ import kotlinx.coroutines.launch
 fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: () -> Unit) {
     val scope = rememberCoroutineScope()
     val manager = vm.callManager
-    val isConnected by manager.isConnected.collectAsState()
+    val callStatus by vm.callStatus.collectAsState()
     val micEnabled by manager.micEnabled.collectAsState()
     val cameraEnabled by manager.cameraEnabled.collectAsState()
     val remoteVideo by manager.remoteVideoTrack.collectAsState()
@@ -44,7 +44,13 @@ fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: ()
     val isVideo = call.kind == "VIDEO"
 
     LaunchedEffect(call.callId) {
-        manager.join(call.livekitUrl, call.token, video = isVideo)
+        runCatching {
+            manager.join(call.livekitUrl, call.token, video = isVideo)
+        }.onSuccess {
+            vm.onCallMediaJoined(call.callId)
+        }.onFailure {
+            vm.onCallJoinFailed(call.callId)
+        }
     }
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -74,7 +80,7 @@ fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: ()
                 }
                 Text(peerName, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
                 Text(
-                    if (isConnected) "Connected" else "Calling…",
+                    callStatus,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

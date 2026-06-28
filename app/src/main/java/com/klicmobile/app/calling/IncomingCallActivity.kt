@@ -27,9 +27,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.klicmobile.app.KlicApplication
 import com.klicmobile.app.MainActivity
 import com.klicmobile.app.ui.theme.KlicIcons
 import com.klicmobile.app.ui.theme.KlicTheme
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 class IncomingCallActivity : ComponentActivity() {
 
@@ -52,7 +55,7 @@ class IncomingCallActivity : ComponentActivity() {
                     callerName = invite.fromName,
                     isVideo = invite.kind == "VIDEO",
                     onAccept = { accept(invite) },
-                    onDecline = { decline() },
+                    onDecline = { decline(invite) },
                 )
             }
         }
@@ -70,7 +73,11 @@ class IncomingCallActivity : ComponentActivity() {
         finish()
     }
 
-    private fun decline() {
+    private fun decline(invite: CallInvite) {
+        (application as KlicApplication).container.socket.emit(
+            "call:decline",
+            buildJsonObject { put("callId", invite.callId) },
+        )
         CallNotifications.cancelIncomingCall(this)
         finish()
     }

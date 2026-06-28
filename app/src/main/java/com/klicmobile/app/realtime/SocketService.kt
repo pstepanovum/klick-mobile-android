@@ -15,6 +15,7 @@ class SocketService {
 
     val incomingMessages = MutableSharedFlow<Message>(extraBufferCapacity = 32)
     val incomingCalls = MutableSharedFlow<CallInvite>(extraBufferCapacity = 8)
+    val callEvents = MutableSharedFlow<CallEvent>(extraBufferCapacity = 16)
 
     data class CallInvite(
         val callId: String,
@@ -24,6 +25,14 @@ class SocketService {
         val kind: String,
         val fromDisplayName: String,
     )
+
+    data class CallEvent(
+        val type: Type,
+        val callId: String,
+        val userId: String? = null,
+    ) {
+        enum class Type { ACCEPT, DECLINE, CANCEL, END }
+    }
 
     fun connect(accessToken: String) {
         val opts = IO.Options().apply { auth = mapOf("token" to accessToken) }
@@ -53,9 +62,33 @@ class SocketService {
                 )
             }
         }
+        socket.on("call:accept") { args ->
+            emitCallEvent(args, CallEvent.Type.ACCEPT)
+        }
+        socket.on("call:decline") { args ->
+            emitCallEvent(args, CallEvent.Type.DECLINE)
+        }
+        socket.on("call:cancel") { args ->
+            emitCallEvent(args, CallEvent.Type.CANCEL)
+        }
+        socket.on("call:end") { args ->
+            emitCallEvent(args, CallEvent.Type.END)
+        }
         socket.connect()
     }
 
     fun emit(event: String, payload: JsonObject) = socket?.emit(event, JSONObject(payload.toString()))
     fun disconnect() { socket?.disconnect(); socket = null }
+
+    private fun emitCallEvent(args: Array<Any>, type: CallEvent.Type) {
+        (args.firstOrNull() as? JSONObject)?.let { json ->
+            callEvents.tryEmit(
+                CallEvent(
+                    type = type,
+                    callId = json.optString("callId"),
+                    userId = json.optString("userId").takeIf { it.isNotBlank() },
+                )
+            )
+        }
+    }
 }

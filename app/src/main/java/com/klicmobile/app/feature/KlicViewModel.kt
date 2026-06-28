@@ -11,6 +11,8 @@ import com.klicmobile.app.data.Message
 import com.klicmobile.app.data.TokenStore
 import com.klicmobile.app.data.User
 import com.klicmobile.app.realtime.SocketService
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
@@ -33,6 +35,7 @@ class KlicViewModel(
     val messages = MutableStateFlow<List<Message>>(emptyList())
     val activeCall = MutableStateFlow<CallSession?>(null)
     val callPeerName = MutableStateFlow("")
+    val callStatus = MutableStateFlow("Calling...")
 
     val friends = MutableStateFlow<List<User>>(emptyList())
     val friendRequests = MutableStateFlow<List<FriendRequest>>(emptyList())
@@ -48,9 +51,16 @@ class KlicViewModel(
                 if (msg.conversationId == openConversationId) messages.value = messages.value + msg
             }
         }
+        viewModelScope.launch {
+            socket.callEvents.collect { event ->
+                handleCallEvent(event)
+            }
+        }
     }
 
     private var openConversationId: String? = null
+    private var activeCallOutgoing = false
+    private var ringTimeoutJob: Job? = null
 
     fun login(username: String, password: String) = launchAuth {
         repo.login(username, password).let { currentUser.value = it }
@@ -80,7 +90,7 @@ class KlicViewModel(
                 val convo = repo.openConversation(userId)
                 repo.startCall(convo.id, kind)
             }.onSuccess { session ->
-                activeCall.value = session
+                startActiveCall(session, peerName, outgoing = true)
                 onStarted()
             }
         }
@@ -134,20 +144,41 @@ class KlicViewModel(
 
     fun startCall(conversationId: String, kind: String, peerName: String) = viewModelScope.launch {
         callPeerName.value = peerName
-        runCatching { repo.startCall(conversationId, kind) }.onSuccess { activeCall.value = it }
+        runCatching { repo.startCall(conversationId, kind) }
+            .onSuccess { startActiveCall(it, peerName, outgoing = true) }
     }
 
     /** Answer an incoming call (from the full-screen notification): fetch a join token. */
     fun acceptIncomingCall(callId: String, peerName: String) = viewModelScope.launch {
         callPeerName.value = peerName
-        runCatching { repo.joinToken(callId) }.onSuccess { activeCall.value = it }
+        callStatus.value = "Connecting..."
+        runCatching { repo.joinToken(callId) }
+            .onSuccess { startActiveCall(it, peerName, outgoing = false) }
+            .onFailure {
+                socket.emit("call:decline", buildJsonObject { put("callId", callId) })
+                callStatus.value = "Call failed"
+                finishCall(delayMs = 1200)
+            }
     }
 
     fun endCall() {
         val id = activeCall.value?.callId
-        callManager.leave()
-        activeCall.value = null
+        finishCall(callId = id)
         if (id != null) viewModelScope.launch { repo.endCall(id) }
+    }
+
+    fun onCallMediaJoined(callId: String) {
+        if (activeCall.value?.callId != callId) return
+        if (activeCallOutgoing) return
+        callStatus.value = "Connected"
+        socket.emit("call:accept", buildJsonObject { put("callId", callId) })
+    }
+
+    fun onCallJoinFailed(callId: String) {
+        if (activeCall.value?.callId != callId) return
+        callStatus.value = "Call failed"
+        socket.emit("call:decline", buildJsonObject { put("callId", callId) })
+        finishCall(delayMs = 1200, callId = callId)
     }
 
     private fun onAuthed() {
@@ -160,6 +191,61 @@ class KlicViewModel(
     /** Emit a read receipt for the open conversation. */
     fun markRead(conversationId: String) {
         socket.emit("message:read", buildJsonObject { put("conversationId", conversationId) })
+    }
+
+    private fun startActiveCall(session: CallSession, peerName: String, outgoing: Boolean) {
+        activeCallOutgoing = outgoing
+        callPeerName.value = peerName
+        callStatus.value = if (outgoing) "Calling..." else "Connecting..."
+        activeCall.value = session
+        if (outgoing) startRingTimeout(session.callId) else cancelRingTimeout()
+    }
+
+    private fun startRingTimeout(callId: String) {
+        cancelRingTimeout()
+        ringTimeoutJob = viewModelScope.launch {
+            delay(45_000)
+            if (activeCall.value?.callId == callId && activeCallOutgoing && callStatus.value == "Calling...") {
+                callStatus.value = "No answer"
+                socket.emit("call:cancel", buildJsonObject { put("callId", callId) })
+                repo.endCall(callId)
+                finishCall(delayMs = 1500, callId = callId)
+            }
+        }
+    }
+
+    private fun cancelRingTimeout() {
+        ringTimeoutJob?.cancel()
+        ringTimeoutJob = null
+    }
+
+    private fun handleCallEvent(event: SocketService.CallEvent) {
+        val currentId = activeCall.value?.callId ?: return
+        if (event.callId != currentId) return
+        when (event.type) {
+            SocketService.CallEvent.Type.ACCEPT -> {
+                cancelRingTimeout()
+                callStatus.value = "Connected"
+            }
+            SocketService.CallEvent.Type.DECLINE -> {
+                callStatus.value = "Busy"
+                viewModelScope.launch { repo.endCall(currentId) }
+                finishCall(delayMs = 1500, callId = currentId)
+            }
+            SocketService.CallEvent.Type.CANCEL,
+            SocketService.CallEvent.Type.END -> finishCall(callId = currentId)
+        }
+    }
+
+    private fun finishCall(delayMs: Long = 0, callId: String? = activeCall.value?.callId) {
+        cancelRingTimeout()
+        viewModelScope.launch {
+            if (delayMs > 0) delay(delayMs)
+            if (callId != null && activeCall.value?.callId != callId) return@launch
+            callManager.leave()
+            activeCall.value = null
+            activeCallOutgoing = false
+        }
     }
 
     // Wraps a suspend auth call with error handling.
