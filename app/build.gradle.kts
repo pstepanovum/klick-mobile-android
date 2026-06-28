@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.klic.app"
+    namespace = "com.klicmobile.app"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.klic.app"
+        applicationId = "com.klicmobile.app"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
