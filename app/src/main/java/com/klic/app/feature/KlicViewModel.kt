@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.klic.app.calling.CallManager
 import com.klic.app.data.CallSession
 import com.klic.app.data.Conversation
+import com.klic.app.data.FriendRequest
 import com.klic.app.data.KlicRepository
 import com.klic.app.data.Message
 import com.klic.app.data.TokenStore
@@ -28,6 +29,10 @@ class KlicViewModel(
     val conversations = MutableStateFlow<List<Conversation>>(emptyList())
     val messages = MutableStateFlow<List<Message>>(emptyList())
     val activeCall = MutableStateFlow<CallSession?>(null)
+
+    val friends = MutableStateFlow<List<User>>(emptyList())
+    val friendRequests = MutableStateFlow<List<FriendRequest>>(emptyList())
+    val friendStatus = MutableStateFlow<String?>(null)
 
     init {
         viewModelScope.launch {
@@ -61,6 +66,38 @@ class KlicViewModel(
 
     fun loadConversations() = viewModelScope.launch {
         runCatching { repo.conversations() }.onSuccess { conversations.value = it }
+    }
+
+    fun loadFriends() = viewModelScope.launch {
+        runCatching { repo.friends() }.onSuccess { friends.value = it }
+        runCatching { repo.friendRequests() }.onSuccess { friendRequests.value = it }
+    }
+
+    fun addFriend(username: String) = viewModelScope.launch {
+        val name = username.trim().lowercase()
+        if (name.isEmpty()) return@launch
+        val user = runCatching { repo.findUser(name) }.getOrNull()
+        if (user == null) {
+            friendStatus.value = "No user named \"$name\"."
+        } else {
+            runCatching { repo.sendFriendRequest(user.id) }
+            friendStatus.value = "Request sent to ${user.displayName}."
+        }
+    }
+
+    fun acceptRequest(id: String) = viewModelScope.launch {
+        runCatching { repo.acceptFriendRequest(id) }; loadFriends()
+    }
+
+    fun declineRequest(id: String) = viewModelScope.launch {
+        runCatching { repo.declineFriendRequest(id) }; loadFriends()
+    }
+
+    fun openConversationWith(userId: String, onReady: (Conversation) -> Unit) = viewModelScope.launch {
+        runCatching { repo.openConversation(userId) }.onSuccess { c ->
+            if (conversations.value.none { it.id == c.id }) conversations.value = conversations.value + c
+            onReady(c)
+        }
     }
 
     fun openChat(conversationId: String) = viewModelScope.launch {

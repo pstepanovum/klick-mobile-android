@@ -1,0 +1,137 @@
+package com.klic.app.feature.friends
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PersonAddAlt1
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.klic.app.data.FriendRequest
+import com.klic.app.data.User
+import com.klic.app.feature.KlicViewModel
+import com.klic.app.ui.components.KlicTextField
+import com.klic.app.ui.theme.OnPrimary
+import com.klic.app.ui.theme.Primary
+import com.klic.app.ui.theme.Surface
+import com.klic.app.ui.theme.SurfaceRaised
+import com.klic.app.ui.theme.TextMuted
+
+@Composable
+fun FriendsScreen(vm: KlicViewModel, onOpenConversation: (String) -> Unit) {
+    val friends by vm.friends.collectAsState()
+    val requests by vm.friendRequests.collectAsState()
+    val status by vm.friendStatus.collectAsState()
+    var username by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) { vm.loadFriends() }
+
+    LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+        item {
+            Text("Add by username", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                KlicTextField(username, { username = it }, "username", modifier = Modifier.weight(1f))
+                Spacer(Modifier.width(10.dp))
+                IconButton(
+                    onClick = { vm.addFriend(username); username = "" },
+                    modifier = Modifier.size(50.dp).background(Primary, CircleShape),
+                ) { Icon(Icons.Default.PersonAddAlt1, contentDescription = "Add friend", tint = OnPrimary) }
+            }
+            status?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = TextMuted, modifier = Modifier.padding(top = 6.dp)) }
+            Spacer(Modifier.size(20.dp))
+        }
+
+        if (requests.isNotEmpty()) {
+            item { SectionTitle("Requests") }
+            items(requests) { req -> RequestRow(req, onAccept = { vm.acceptRequest(req.requestId) }, onDecline = { vm.declineRequest(req.requestId) }) }
+            item { Spacer(Modifier.size(20.dp)) }
+        }
+
+        item { SectionTitle("Your friends") }
+        if (friends.isEmpty()) {
+            item { Text("No friends yet — add someone by username above.", style = MaterialTheme.typography.bodyMedium, color = TextMuted) }
+        }
+        items(friends) { friend ->
+            FriendRow(friend) { vm.openConversationWith(friend.id) { convo -> onOpenConversation(convo.id) } }
+        }
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+}
+
+@Composable
+private fun RequestRow(req: FriendRequest, onAccept: () -> Unit, onDecline: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            .background(Surface, RoundedCornerShape(18.dp)).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Avatar()
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(req.from.displayName, style = MaterialTheme.typography.bodyLarge)
+            Text("@${req.from.username}", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+        }
+        IconButton(onClick = onAccept, modifier = Modifier.size(40.dp).background(Primary, CircleShape)) {
+            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Accept", tint = OnPrimary)
+        }
+        Spacer(Modifier.width(8.dp))
+        IconButton(onClick = onDecline, modifier = Modifier.size(40.dp).background(SurfaceRaised, CircleShape)) {
+            Icon(Icons.Default.Close, contentDescription = "Decline", tint = TextMuted)
+        }
+    }
+}
+
+@Composable
+private fun FriendRow(friend: User, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            .background(Surface, RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Avatar()
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(friend.displayName, style = MaterialTheme.typography.bodyLarge)
+            Text("@${friend.username}", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+        }
+        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Message", tint = TextMuted)
+    }
+}
+
+@Composable
+private fun Avatar() {
+    Box(Modifier.size(44.dp).background(SurfaceRaised, CircleShape), contentAlignment = Alignment.Center) {
+        Icon(Icons.Default.Person, contentDescription = null, tint = TextMuted)
+    }
+}

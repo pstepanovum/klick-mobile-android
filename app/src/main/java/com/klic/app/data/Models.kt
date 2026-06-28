@@ -45,6 +45,12 @@ data class Message(
 )
 
 @Serializable
+data class RequestFrom(val id: String, val username: String, val displayName: String)
+
+@Serializable
+data class FriendRequest(val requestId: String, val from: RequestFrom)
+
+@Serializable
 data class SendMessageRequest(val body: String)
 
 @Serializable

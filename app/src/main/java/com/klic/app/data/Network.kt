@@ -3,6 +3,8 @@ package com.klic.app.data
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.ResponseBody
+import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import retrofit2.http.Body
@@ -33,6 +35,21 @@ interface KlicApi {
     @GET("users")
     suspend fun findUser(@Query("username") username: String): List<User>
 
+    @GET("friends")
+    suspend fun friends(): List<User>
+
+    @GET("friends/requests")
+    suspend fun friendRequests(): List<FriendRequest>
+
+    @POST("friends/requests")
+    suspend fun sendFriendRequest(@Body body: Map<String, String>): Response<ResponseBody>
+
+    @POST("friends/requests/{id}/accept")
+    suspend fun acceptFriendRequest(@Path("id") id: String): Response<ResponseBody>
+
+    @POST("friends/requests/{id}/decline")
+    suspend fun declineFriendRequest(@Path("id") id: String): Response<ResponseBody>
+
     @POST("calls")
     suspend fun startCall(@Body body: StartCallRequest): CallSession
 
@@ -41,8 +58,8 @@ interface KlicApi {
 }
 
 object Network {
-    // 10.0.2.2 is the host machine from the Android emulator.
-    const val BASE_HTTP = "http://10.0.2.2:3000"
+    // Live server (TLS via sslip.io). For local dev use "http://10.0.2.2:3000" (emulator → host).
+    const val BASE_HTTP = "https://api.89.34.230.2.sslip.io"
     private const val API = "$BASE_HTTP/api/v1/"
 
     private val json = Json { ignoreUnknownKeys = true }

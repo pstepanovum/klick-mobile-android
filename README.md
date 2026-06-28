@@ -8,8 +8,9 @@ chat, and call signaling, and to LiveKit for audio/video media.
 - An emulator or device on API 26+
 
 ## Run
-Open the folder in Android Studio and let Gradle sync, then Run. From the emulator the app reaches
-the host backend at `http://10.0.2.2:3000` (see `data/Network.kt`). Start `klick-server` first.
+Open the folder in Android Studio and let Gradle sync, then Run. By default the app targets the
+**live server** `https://api.89.34.230.2.sslip.io` (see `data/Network.kt`). To use a local backend,
+set `BASE_HTTP = "http://10.0.2.2:3000"` (emulator → host) and start `klick-server` first.
 
 CLI: `./gradlew :app:installDebug`
 
