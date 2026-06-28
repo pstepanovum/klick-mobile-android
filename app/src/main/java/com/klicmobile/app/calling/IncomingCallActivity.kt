@@ -44,9 +44,11 @@ class IncomingCallActivity : ComponentActivity() {
     }
 
     private var callId: String? = null
+    private val ringer by lazy { CallRinger(applicationContext) }
     private val callEndedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == ACTION_CALL_ENDED && intent.getStringExtra("callId") == callId) {
+                ringer.stop()
                 CallNotifications.cancelIncomingCall(this@IncomingCallActivity)
                 finish()
             }
@@ -67,6 +69,7 @@ class IncomingCallActivity : ComponentActivity() {
         } else {
             registerReceiver(callEndedReceiver, IntentFilter(ACTION_CALL_ENDED))
         }
+        ringer.start()
 
         setContent {
             KlicTheme {
@@ -81,11 +84,13 @@ class IncomingCallActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        ringer.stop()
         runCatching { unregisterReceiver(callEndedReceiver) }
         super.onDestroy()
     }
 
     private fun accept(invite: CallInvite) {
+        ringer.stop()
         CallNotifications.cancelIncomingCall(this)
         startActivity(
             Intent(this, MainActivity::class.java).apply {
@@ -98,6 +103,7 @@ class IncomingCallActivity : ComponentActivity() {
     }
 
     private fun decline(invite: CallInvite) {
+        ringer.stop()
         val container = (application as KlicApplication).container
         container.applicationScope.launch { container.repository.declineCall(invite.callId) }
         CallNotifications.cancelIncomingCall(this)
