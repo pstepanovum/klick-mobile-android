@@ -12,13 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CallEnd
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,16 +23,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.klicmobile.app.calling.LiveKitVideo
 import com.klicmobile.app.data.CallSession
 import com.klicmobile.app.feature.KlicViewModel
 import com.klicmobile.app.ui.components.CircleControl
-import com.klicmobile.app.ui.theme.Background
-import com.klicmobile.app.ui.theme.Danger
-import com.klicmobile.app.ui.theme.OnPrimary
-import com.klicmobile.app.ui.theme.SurfaceRaised
-import com.klicmobile.app.ui.theme.TextMuted
+import com.klicmobile.app.ui.theme.KlicIcons
 import kotlinx.coroutines.launch
 
 @Composable
@@ -57,7 +47,7 @@ fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: ()
         manager.join(call.livekitUrl, call.token, video = isVideo)
     }
 
-    Box(Modifier.fillMaxSize().background(Background)) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (isVideo && remoteVideo != null) {
             LiveKitVideo(manager.room, remoteVideo, Modifier.fillMaxSize())
         }
@@ -69,37 +59,47 @@ fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: ()
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 if (!(isVideo && remoteVideo != null)) {
-                    Box(Modifier.size(120.dp).background(SurfaceRaised, CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Person, contentDescription = null, tint = TextMuted)
+                    Box(
+                        Modifier.size(120.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painter = painterResource(KlicIcons.user),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(48.dp),
+                        )
                     }
                     Spacer(Modifier.height(16.dp))
                 }
-                Text(peerName, style = MaterialTheme.typography.titleLarge)
-                Text(if (isConnected) "Connected" else "Calling…", color = TextMuted)
+                Text(peerName, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
+                Text(
+                    if (isConnected) "Connected" else "Calling…",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
                 CircleControl(
-                    icon = if (micEnabled) Icons.Default.Mic else Icons.Default.MicOff,
+                    painter = painterResource(if (micEnabled) KlicIcons.mic else KlicIcons.micOff),
                     contentDescription = "Toggle microphone",
                 ) { scope.launch { manager.toggleMic() } }
 
                 CircleControl(
-                    icon = Icons.Default.CallEnd,
+                    painter = painterResource(KlicIcons.callEnd),
                     contentDescription = "End call",
-                    fill = Danger,
-                    tint = OnPrimary,
+                    fill = MaterialTheme.colorScheme.error,
+                    tint = MaterialTheme.colorScheme.onError,
                     diameter = 72,
                 ) { vm.endCall(); onEnd() }
 
                 CircleControl(
-                    icon = if (cameraEnabled) Icons.Default.Videocam else Icons.Default.VideocamOff,
+                    painter = painterResource(if (cameraEnabled) KlicIcons.camera else KlicIcons.cameraOff),
                     contentDescription = "Toggle camera",
                 ) { scope.launch { manager.toggleCamera() } }
             }
         }
 
-        // Local camera preview (picture-in-picture)
         if (isVideo && cameraEnabled && localVideo != null) {
             LiveKitVideo(
                 manager.room, localVideo,

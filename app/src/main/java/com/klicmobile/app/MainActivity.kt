@@ -8,9 +8,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.People
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -22,6 +19,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider.Factory
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -36,19 +34,30 @@ import com.klicmobile.app.calling.CallSignalingService
 import com.klicmobile.app.calling.IncomingCallActivity
 import com.klicmobile.app.feature.KlicViewModel
 import com.klicmobile.app.feature.auth.AuthScreen
+import com.klicmobile.app.feature.call.CallDialScreen
 import com.klicmobile.app.feature.call.CallScreen
 import com.klicmobile.app.feature.chat.ChatScreen
 import com.klicmobile.app.feature.conversations.ConversationsScreen
 import com.klicmobile.app.feature.friends.FriendsScreen
+import com.klicmobile.app.feature.settings.SettingsScreen
+import com.klicmobile.app.ui.theme.KlicIcons
 import com.klicmobile.app.ui.theme.KlicTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 
-private data class Tab(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+private data class Tab(
+    val route: String,
+    val label: String,
+    val iconRes: Int,
+)
 
 private val tabs = listOf(
-    Tab("home", "Chats", Icons.AutoMirrored.Filled.Chat),
-    Tab("friends", "Friends", Icons.Default.People),
+    Tab("home",     "Chats",    KlicIcons.message),
+    Tab("friends",  "Friends",  KlicIcons.user),
+    Tab("call",     "Call",     KlicIcons.phone),
+    Tab("settings", "Settings", KlicIcons.settings),
 )
+
+private val tabRoutes = tabs.map { it.route }.toSet()
 
 class MainActivity : ComponentActivity() {
     private val pendingCall = MutableStateFlow<CallInvite?>(null)
@@ -70,13 +79,14 @@ class MainActivity : ComponentActivity() {
         val container = (application as KlicApplication).container
 
         setContent {
-            KlicTheme {
-                val vm: KlicViewModel = viewModel(factory = factory(container))
-                val isAuthed by vm.isAuthenticated.collectAsState()
-                val context = LocalContext.current
-                LaunchedEffect(isAuthed) {
-                    if (isAuthed) CallSignalingService.start(context) else CallSignalingService.stop(context)
-                }
+            val vm: KlicViewModel = viewModel(factory = factory(container))
+            val isAuthed by vm.isAuthenticated.collectAsState()
+            val isDark by vm.isDark.collectAsState()
+            val context = LocalContext.current
+            LaunchedEffect(isAuthed) {
+                if (isAuthed) CallSignalingService.start(context) else CallSignalingService.stop(context)
+            }
+            KlicTheme(isDark = isDark) {
                 if (!isAuthed) AuthScreen(vm) else Home(vm)
             }
         }
@@ -98,14 +108,13 @@ class MainActivity : ComponentActivity() {
         val navController = rememberNavController()
         val backStack by navController.currentBackStackEntryAsState()
         val route = backStack?.destination?.route
-        val showBar = route == "home" || route == "friends"
+        val showBar = route in tabRoutes
 
-        // An accepted incoming call → join and show the call screen.
         val incoming by pendingCall.collectAsState()
         LaunchedEffect(incoming) {
             incoming?.let { invite ->
                 vm.acceptIncomingCall(invite.callId, invite.fromName)
-                navController.navigate("call")
+                navController.navigate("active_call")
                 pendingCall.value = null
             }
         }
@@ -125,7 +134,12 @@ class MainActivity : ComponentActivity() {
                                         restoreState = true
                                     }
                                 },
-                                icon = { Icon(tab.icon, contentDescription = tab.label) },
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(tab.iconRes),
+                                        contentDescription = tab.label,
+                                    )
+                                },
                                 label = { Text(tab.label) },
                             )
                         }
@@ -133,12 +147,22 @@ class MainActivity : ComponentActivity() {
                 }
             },
         ) { padding ->
-            NavHost(navController, startDestination = "home", modifier = Modifier.padding(padding)) {
+            NavHost(
+                navController,
+                startDestination = "home",
+                modifier = Modifier.padding(padding),
+            ) {
                 composable("home") {
                     ConversationsScreen(vm) { convo -> navController.navigate("chat/${convo.id}") }
                 }
                 composable("friends") {
                     FriendsScreen(vm) { conversationId -> navController.navigate("chat/$conversationId") }
+                }
+                composable("call") {
+                    CallDialScreen(vm) { navController.navigate("active_call") }
+                }
+                composable("settings") {
+                    SettingsScreen(vm)
                 }
                 composable("chat/{conversationId}") { entry ->
                     val id = entry.arguments?.getString("conversationId").orEmpty()
@@ -147,14 +171,16 @@ class MainActivity : ComponentActivity() {
                             vm = vm,
                             conversation = convo,
                             onBack = { navController.popBackStack() },
-                            onCall = { navController.navigate("call") },
+                            onCall = { navController.navigate("active_call") },
                         )
                     }
                 }
-                composable("call") {
+                composable("active_call") {
                     val call by vm.activeCall.collectAsState()
                     val peer by vm.callPeerName.collectAsState()
-                    call?.let { CallScreen(vm, it, peerName = peer) { navController.popBackStack() } }
+                    call?.let {
+                        CallScreen(vm, it, peerName = peer) { navController.popBackStack() }
+                    }
                 }
             }
         }
@@ -163,6 +189,12 @@ class MainActivity : ComponentActivity() {
     private fun factory(container: AppContainer) = object : Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            KlicViewModel(container.repository, container.tokenStore, container.socket, container.callManager) as T
+            KlicViewModel(
+                container.repository,
+                container.tokenStore,
+                container.socket,
+                container.callManager,
+                container,
+            ) as T
     }
 }

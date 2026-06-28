@@ -25,4 +25,9 @@ class AppContainer(app: Application) {
     val repository = KlicRepository(Network.create(tokenStore), tokenStore)
     val socket = SocketService()
     val callManager = CallManager(app)
+
+    private val prefs = app.getSharedPreferences("klic_prefs", android.content.Context.MODE_PRIVATE)
+    var isDark: Boolean
+        get() = prefs.getBoolean("dark_theme", true)
+        set(value) { prefs.edit().putBoolean("dark_theme", value).apply() }
 }

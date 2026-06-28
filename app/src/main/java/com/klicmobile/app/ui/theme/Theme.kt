@@ -2,24 +2,40 @@ package com.klicmobile.app.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
-private val KlicColors = darkColorScheme(
-    primary = Primary,
-    onPrimary = OnPrimary,
-    background = Background,
-    onBackground = TextPrimary,
-    surface = Surface,
-    onSurface = TextPrimary,
-    surfaceVariant = SurfaceRaised,
-    error = Danger,
+private val DarkColors = darkColorScheme(
+    primary          = BrandPrimary,
+    onPrimary        = BrandOnPrimary,
+    background       = DarkBackground,
+    onBackground     = DarkTextPrimary,
+    surface          = DarkSurface,
+    onSurface        = DarkTextPrimary,
+    surfaceVariant   = DarkSurfaceRaised,
+    onSurfaceVariant = DarkTextMuted,
+    error            = BrandDanger,
+    onError          = BrandOnPrimary,
+)
+
+private val LightColors = lightColorScheme(
+    primary          = BrandPrimary,
+    onPrimary        = BrandOnPrimary,
+    background       = LightBackground,
+    onBackground     = LightTextPrimary,
+    surface          = LightSurface,
+    onSurface        = LightTextPrimary,
+    surfaceVariant   = LightSurfaceRaised,
+    onSurfaceVariant = LightTextMuted,
+    error            = BrandDanger,
+    onError          = BrandOnPrimary,
 )
 
 @Composable
-fun KlicTheme(content: @Composable () -> Unit) {
+fun KlicTheme(isDark: Boolean = true, content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = KlicColors, // dark-first regardless of system setting
-        typography = KlicTypography,
-        content = content,
+        colorScheme = if (isDark) DarkColors else LightColors,
+        typography  = KlicTypography,
+        content     = content,
     )
 }

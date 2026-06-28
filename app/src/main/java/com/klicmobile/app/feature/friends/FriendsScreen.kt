@@ -16,13 +16,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PersonAddAlt1
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,16 +30,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.klicmobile.app.data.FriendRequest
 import com.klicmobile.app.data.User
 import com.klicmobile.app.feature.KlicViewModel
 import com.klicmobile.app.ui.components.KlicTextField
-import com.klicmobile.app.ui.theme.OnPrimary
-import com.klicmobile.app.ui.theme.Primary
-import com.klicmobile.app.ui.theme.Surface
-import com.klicmobile.app.ui.theme.SurfaceRaised
-import com.klicmobile.app.ui.theme.TextMuted
+import com.klicmobile.app.ui.theme.KlicIcons
 
 @Composable
 fun FriendsScreen(vm: KlicViewModel, onOpenConversation: (String) -> Unit) {
@@ -62,25 +55,56 @@ fun FriendsScreen(vm: KlicViewModel, onOpenConversation: (String) -> Unit) {
                 Spacer(Modifier.width(10.dp))
                 IconButton(
                     onClick = { vm.addFriend(username); username = "" },
-                    modifier = Modifier.size(50.dp).background(Primary, CircleShape),
-                ) { Icon(Icons.Default.PersonAddAlt1, contentDescription = "Add friend", tint = OnPrimary) }
+                    modifier = Modifier.size(50.dp),
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
+                ) {
+                    Icon(
+                        painter = painterResource(KlicIcons.addUser),
+                        contentDescription = "Add friend",
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
             }
-            status?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = TextMuted, modifier = Modifier.padding(top = 6.dp)) }
+            status?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
             Spacer(Modifier.size(20.dp))
         }
 
         if (requests.isNotEmpty()) {
             item { SectionTitle("Requests") }
-            items(requests) { req -> RequestRow(req, onAccept = { vm.acceptRequest(req.requestId) }, onDecline = { vm.declineRequest(req.requestId) }) }
+            items(requests) { req ->
+                RequestRow(
+                    req,
+                    onAccept  = { vm.acceptRequest(req.requestId) },
+                    onDecline = { vm.declineRequest(req.requestId) },
+                )
+            }
             item { Spacer(Modifier.size(20.dp)) }
         }
 
         item { SectionTitle("Your friends") }
         if (friends.isEmpty()) {
-            item { Text("No friends yet — add someone by username above.", style = MaterialTheme.typography.bodyMedium, color = TextMuted) }
+            item {
+                Text(
+                    "No friends yet — add someone by username above.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         items(friends) { friend ->
-            FriendRow(friend) { vm.openConversationWith(friend.id) { convo -> onOpenConversation(convo.id) } }
+            FriendRow(friend) {
+                vm.openConversationWith(friend.id) { convo -> onOpenConversation(convo.id) }
+            }
         }
     }
 }
@@ -93,21 +117,38 @@ private fun SectionTitle(text: String) {
 @Composable
 private fun RequestRow(req: FriendRequest, onAccept: () -> Unit, onDecline: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            .background(Surface, RoundedCornerShape(18.dp)).padding(12.dp),
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(18.dp))
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Avatar()
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
-            Text(req.from.displayName, style = MaterialTheme.typography.bodyLarge)
-            Text("@${req.from.username}", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+            Text(req.from.displayName, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text("@${req.from.username}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        IconButton(onClick = onAccept, modifier = Modifier.size(40.dp).background(Primary, CircleShape)) {
-            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Accept", tint = OnPrimary)
+        IconButton(
+            onClick = onAccept,
+            modifier = Modifier.size(40.dp),
+            colors = IconButtonDefaults.iconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+        ) {
+            Icon(painter = painterResource(KlicIcons.message), contentDescription = "Accept", modifier = Modifier.size(18.dp))
         }
         Spacer(Modifier.width(8.dp))
-        IconButton(onClick = onDecline, modifier = Modifier.size(40.dp).background(SurfaceRaised, CircleShape)) {
-            Icon(Icons.Default.Close, contentDescription = "Decline", tint = TextMuted)
+        IconButton(
+            onClick = onDecline,
+            modifier = Modifier.size(40.dp),
+            colors = IconButtonDefaults.iconButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+        ) {
+            Icon(painter = painterResource(KlicIcons.close), contentDescription = "Decline", modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -115,23 +156,39 @@ private fun RequestRow(req: FriendRequest, onAccept: () -> Unit, onDecline: () -
 @Composable
 private fun FriendRow(friend: User, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            .background(Surface, RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick).padding(12.dp),
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Avatar()
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
-            Text(friend.displayName, style = MaterialTheme.typography.bodyLarge)
-            Text("@${friend.username}", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+            Text(friend.displayName, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text("@${friend.username}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Message", tint = TextMuted)
+        Icon(
+            painter = painterResource(KlicIcons.message),
+            contentDescription = "Message",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
 @Composable
 private fun Avatar() {
-    Box(Modifier.size(44.dp).background(SurfaceRaised, CircleShape), contentAlignment = Alignment.Center) {
-        Icon(Icons.Default.Person, contentDescription = null, tint = TextMuted)
+    Box(
+        Modifier.size(44.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(KlicIcons.user),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(22.dp),
+        )
     }
 }

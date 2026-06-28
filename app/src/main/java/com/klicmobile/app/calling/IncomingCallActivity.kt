@@ -17,10 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.CallEnd
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,14 +25,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.klicmobile.app.MainActivity
-import com.klicmobile.app.ui.theme.Background
-import com.klicmobile.app.ui.theme.Danger
+import com.klicmobile.app.ui.theme.KlicIcons
 import com.klicmobile.app.ui.theme.KlicTheme
-import com.klicmobile.app.ui.theme.OnPrimary
-import com.klicmobile.app.ui.theme.SurfaceRaised
-import com.klicmobile.app.ui.theme.TextMuted
 
 class IncomingCallActivity : ComponentActivity() {
 
@@ -46,7 +39,6 @@ class IncomingCallActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Show over the lock screen and wake the device.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -87,24 +79,39 @@ class IncomingCallActivity : ComponentActivity() {
 @Composable
 private fun IncomingCallScreen(callerName: String, isVideo: Boolean, onAccept: () -> Unit, onDecline: () -> Unit) {
     Column(
-        Modifier.fillMaxSize().background(Background).padding(vertical = 80.dp),
+        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(vertical = 80.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(120.dp).background(SurfaceRaised, CircleShape), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Person, contentDescription = null, tint = TextMuted)
+            Box(
+                Modifier.size(120.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(painterResource(KlicIcons.user), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(48.dp))
             }
             Spacer(Modifier.height(16.dp))
-            Text(callerName, style = MaterialTheme.typography.titleLarge)
-            Text(if (isVideo) "Incoming video call" else "Incoming call", color = TextMuted)
+            Text(callerName, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
+            Text(
+                if (isVideo) "Incoming video call" else "Incoming call",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 48.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            IconButton(onClick = onDecline, modifier = Modifier.size(72.dp).background(Danger, CircleShape)) {
-                Icon(Icons.Default.CallEnd, contentDescription = "Decline", tint = OnPrimary)
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 48.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            IconButton(
+                onClick = onDecline,
+                modifier = Modifier.size(72.dp).background(MaterialTheme.colorScheme.error, CircleShape),
+            ) {
+                Icon(painterResource(KlicIcons.callEnd), contentDescription = "Decline", tint = MaterialTheme.colorScheme.onError, modifier = Modifier.size(30.dp))
             }
-            IconButton(onClick = onAccept, modifier = Modifier.size(72.dp).background(Color(0xFF2BD158), CircleShape)) {
-                Icon(Icons.Default.Call, contentDescription = "Accept", tint = OnPrimary)
+            IconButton(
+                onClick = onAccept,
+                modifier = Modifier.size(72.dp).background(Color(0xFF2BD158), CircleShape),
+            ) {
+                Icon(painterResource(KlicIcons.phone), contentDescription = "Accept", tint = Color.White, modifier = Modifier.size(30.dp))
             }
         }
     }

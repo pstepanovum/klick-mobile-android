@@ -2,10 +2,10 @@ package com.klicmobile.app.feature.auth
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -21,8 +21,6 @@ import androidx.compose.ui.unit.dp
 import com.klicmobile.app.feature.KlicViewModel
 import com.klicmobile.app.ui.components.KlicTextField
 import com.klicmobile.app.ui.components.PillButton
-import com.klicmobile.app.ui.theme.Danger
-import com.klicmobile.app.ui.theme.TextMuted
 
 @Composable
 fun AuthScreen(vm: KlicViewModel) {
@@ -41,7 +39,7 @@ fun AuthScreen(vm: KlicViewModel) {
         Text(
             if (isRegistering) "Create your account" else "Welcome back",
             style = MaterialTheme.typography.bodyLarge,
-            color = TextMuted,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(24.dp))
 
@@ -62,9 +60,11 @@ fun AuthScreen(vm: KlicViewModel) {
         TextButton(onClick = { isRegistering = !isRegistering }) {
             Text(
                 if (isRegistering) "I already have an account" else "Create an account",
-                color = TextMuted,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        error?.let { Text(it, color = Danger, style = MaterialTheme.typography.labelSmall) }
+        error?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+        }
     }
 }

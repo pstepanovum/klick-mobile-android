@@ -21,11 +21,13 @@ class KlicViewModel(
     private val tokenStore: TokenStore,
     private val socket: SocketService,
     val callManager: CallManager,
+    private val container: com.klicmobile.app.AppContainer,
 ) : ViewModel() {
 
     val currentUser = MutableStateFlow<User?>(null)
     val isAuthenticated = MutableStateFlow(false)
     val error = MutableStateFlow<String?>(null)
+    val isDark = MutableStateFlow(container.isDark)
 
     val conversations = MutableStateFlow<List<Conversation>>(emptyList())
     val messages = MutableStateFlow<List<Message>>(emptyList())
@@ -65,6 +67,23 @@ class KlicViewModel(
         socket.disconnect()
         isAuthenticated.value = false
     }
+
+    fun setDark(value: Boolean) {
+        isDark.value = value
+        container.isDark = value
+    }
+
+    fun callFriendDirect(userId: String, kind: String, peerName: String, onStarted: () -> Unit) =
+        viewModelScope.launch {
+            callPeerName.value = peerName
+            runCatching {
+                val convo = repo.openConversation(userId)
+                repo.startCall(convo.id, kind)
+            }.onSuccess { session ->
+                activeCall.value = session
+                onStarted()
+            }
+        }
 
     fun loadConversations() = viewModelScope.launch {
         runCatching { repo.conversations() }.onSuccess { conversations.value = it }
