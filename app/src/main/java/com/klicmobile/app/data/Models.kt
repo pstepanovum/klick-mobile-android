@@ -66,6 +66,20 @@ data class Conversation(
 )
 
 @Serializable
+data class Attachment(
+    val id: String,
+    val kind: String,
+    val url: String,
+    val contentType: String,
+    val byteSize: Int,
+    val width: Int? = null,
+    val height: Int? = null,
+    val durationMs: Int? = null,
+    val waveform: String? = null,   // base64-encoded 5-bit packed waveform (VOICE only)
+    val fileName: String? = null,
+)
+
+@Serializable
 data class Message(
     val id: String,
     val conversationId: String,
@@ -74,6 +88,31 @@ data class Message(
     val kind: String = "TEXT",
     val createdAt: String = "",
     val status: String? = null,   // "sent" | "delivered" | "read" — own messages only
+    val attachments: List<Attachment> = emptyList(),
+)
+
+@Serializable
+data class UploadRequest(
+    val conversationId: String,
+    val kind: String,
+    val contentType: String,
+    val byteSize: Int,
+)
+
+@Serializable
+data class AttachmentInput(
+    val key: String,
+    val kind: String,
+    val contentType: String,
+    val byteSize: Int,
+    val durationMs: Int? = null,
+    val waveform: String? = null,
+)
+
+@Serializable
+data class SendWithAttachmentsRequest(
+    val body: String? = null,
+    val attachments: List<AttachmentInput>,
 )
 
 @Serializable

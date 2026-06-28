@@ -167,6 +167,12 @@ class KlicViewModel(
             .onSuccess { messages.value = messages.value + it }
     }
 
+    fun sendVoice(conversationId: String, bytes: ByteArray, durationMs: Int, waveform: ByteArray) =
+        viewModelScope.launch {
+            runCatching { repo.uploadVoice(conversationId, bytes, durationMs, waveform) }
+                .onSuccess { messages.value = messages.value + it }
+        }
+
     fun startCall(conversationId: String, kind: String, peerName: String) = viewModelScope.launch {
         if (activeCall.value != null) return@launch
         callPeerName.value = peerName
