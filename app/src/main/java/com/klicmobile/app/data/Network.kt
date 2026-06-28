@@ -49,6 +49,12 @@ interface KlicApi {
     @POST("conversations/{id}/messages")
     suspend fun send(@Path("id") id: String, @Body body: SendMessageRequest): Message
 
+    @POST("conversations/{id}/messages")
+    suspend fun sendMessage(@Path("id") id: String, @Body body: SendWithAttachmentsRequest): Message
+
+    @POST("uploads")
+    suspend fun requestUpload(@Body body: UploadRequest): UploadTicket
+
     @POST("me/devices")
     suspend fun registerDevice(@Body body: Map<String, String>): Response<ResponseBody>
 

@@ -1,5 +1,6 @@
 package com.klicmobile.app.feature.chat
 
+import android.Manifest
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -30,7 +32,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -66,6 +71,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import com.klicmobile.app.data.Attachment
 import com.klicmobile.app.data.Conversation
 import com.klicmobile.app.data.Message
 import com.klicmobile.app.feature.KlicViewModel
@@ -102,6 +108,11 @@ fun ChatScreen(
     var showAttachSheet by remember { mutableStateOf(false) }
     var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val recorder = remember { VoiceRecorder(context) }
+    val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) recorder.start()
+    }
 
     val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { /* TODO: upload via vm */ }
@@ -199,14 +210,27 @@ fun ChatScreen(
                 }
             }
 
-            ComposerBar(
-                draft    = draft,
-                onChange = { draft = it },
-                onSend   = {
-                    if (draft.isNotBlank()) { vm.send(conversation.id, draft.trim()); draft = "" }
-                },
-                onAttach = { showAttachSheet = true },
-            )
+            if (recorder.isRecording) {
+                RecordingBar(
+                    elapsed  = recorder.elapsed,
+                    onCancel = { recorder.cancel() },
+                    onSend   = {
+                        recorder.stop()?.let { (bytes, durationMs, waveform) ->
+                            vm.sendVoice(conversation.id, bytes, durationMs, waveform)
+                        }
+                    },
+                )
+            } else {
+                ComposerBar(
+                    draft    = draft,
+                    onChange = { draft = it },
+                    onSend   = {
+                        if (draft.isNotBlank()) { vm.send(conversation.id, draft.trim()); draft = "" }
+                    },
+                    onAttach = { showAttachSheet = true },
+                    onMic    = { micPermission.launch(Manifest.permission.RECORD_AUDIO) },
+                )
+            }
         }
         } // Box
     }
@@ -260,26 +284,31 @@ private fun MessageBubble(message: Message, isMine: Boolean, isFirst: Boolean, i
             .padding(vertical = 1.dp),
         horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
     ) {
-        Box(
-            Modifier
-                .widthIn(max = 280.dp)
-                .background(
-                    if (isMine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                    shape,
+        val voiceAtt = message.attachments.firstOrNull { it.kind == "VOICE" }
+        if (voiceAtt != null) {
+            VoiceAttachmentView(att = voiceAtt, isMine = isMine)
+        } else {
+            Box(
+                Modifier
+                    .widthIn(max = 280.dp)
+                    .background(
+                        if (isMine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                        shape,
+                    )
+                    .combinedClickable(
+                        onClick = {},
+                        onLongClick = {
+                            if (message.body.isNotBlank()) clipboard.setText(AnnotatedString(message.body))
+                        },
+                    )
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+            ) {
+                Text(
+                    message.body,
+                    color = if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.bodyLarge,
                 )
-                .combinedClickable(
-                    onClick = {},
-                    onLongClick = {
-                        if (message.body.isNotBlank()) clipboard.setText(AnnotatedString(message.body))
-                    },
-                )
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-        ) {
-            Text(
-                message.body,
-                color = if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.bodyLarge,
-            )
+            }
         }
 
         if (isLast) {
@@ -423,9 +452,16 @@ private fun AttachTile(iconRes: Int, label: String, color: Color, onClick: () ->
 // MARK: - Composer
 
 @Composable
-private fun ComposerBar(draft: String, onChange: (String) -> Unit, onSend: () -> Unit, onAttach: () -> Unit) {
+private fun ComposerBar(
+    draft: String,
+    onChange: (String) -> Unit,
+    onSend: () -> Unit,
+    onAttach: () -> Unit,
+    onMic: () -> Unit,
+) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(200)
         runCatching { focusRequester.requestFocus() }
     }
 
@@ -470,20 +506,68 @@ private fun ComposerBar(draft: String, onChange: (String) -> Unit, onSend: () ->
 
         val canSend = draft.isNotBlank()
         IconButton(
-            onClick = onSend,
+            onClick = if (canSend) onSend else onMic,
             modifier = Modifier.size(44.dp),
-            enabled = canSend,
             colors = IconButtonDefaults.iconButtonColors(
-                containerColor = if (canSend) MaterialTheme.colorScheme.primary
-                                 else MaterialTheme.colorScheme.surfaceVariant,
+                containerColor = MaterialTheme.colorScheme.primary,
                 contentColor   = MaterialTheme.colorScheme.onPrimary,
             ),
         ) {
             Icon(
-                painter = painterResource(KlicIcons.send),
-                contentDescription = "Send",
+                imageVector = if (canSend) Icons.Filled.Send else Icons.Filled.Mic,
+                contentDescription = if (canSend) "Send" else "Record",
                 modifier = Modifier.size(20.dp),
             )
+        }
+    }
+}
+
+@Composable
+private fun RecordingBar(elapsed: Float, onCancel: () -> Unit, onSend: () -> Unit) {
+    val s = elapsed.toInt()
+    val timeText = "%d:%02d".format(s / 60, s % 60)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        IconButton(
+            onClick = onCancel,
+            modifier = Modifier.size(44.dp),
+            colors = IconButtonDefaults.iconButtonColors(
+                containerColor = Color.Transparent,
+                contentColor   = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+        ) {
+            Icon(Icons.Filled.Delete, contentDescription = "Cancel recording", modifier = Modifier.size(22.dp))
+        }
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .background(Color.Red, CircleShape)
+        )
+        Text(
+            timeText,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.weight(1f))
+        Text(
+            "Recording…",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        IconButton(
+            onClick = onSend,
+            modifier = Modifier.size(44.dp),
+            colors = IconButtonDefaults.iconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor   = MaterialTheme.colorScheme.onPrimary,
+            ),
+        ) {
+            Icon(Icons.Filled.Send, contentDescription = "Send voice", modifier = Modifier.size(20.dp))
         }
     }
 }

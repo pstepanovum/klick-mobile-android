@@ -107,6 +107,33 @@ class KlicRepository(
     suspend fun send(conversationId: String, body: String): Message =
         api.send(conversationId, SendMessageRequest(body))
 
+    suspend fun uploadVoice(
+        conversationId: String,
+        bytes: ByteArray,
+        durationMs: Int,
+        waveform: ByteArray,
+    ): Message {
+        val contentType = "audio/m4a"
+        val ticket = api.requestUpload(UploadRequest(conversationId, "VOICE", contentType, bytes.size))
+        val request = Request.Builder()
+            .url(ticket.uploadUrl)
+            .put(bytes.toRequestBody(contentType.toMediaType()))
+            .build()
+        uploader.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) error("Voice upload failed (${resp.code})")
+        }
+        return api.sendMessage(conversationId, SendWithAttachmentsRequest(
+            attachments = listOf(AttachmentInput(
+                key = ticket.key,
+                kind = "VOICE",
+                contentType = contentType,
+                byteSize = bytes.size,
+                durationMs = durationMs,
+                waveform = android.util.Base64.encodeToString(waveform, android.util.Base64.NO_WRAP),
+            ))
+        ))
+    }
+
     suspend fun startCall(conversationId: String, kind: String): CallSession =
         api.startCall(StartCallRequest(conversationId, kind))
 
