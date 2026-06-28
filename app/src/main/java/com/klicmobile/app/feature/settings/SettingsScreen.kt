@@ -52,7 +52,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(vm: KlicViewModel, onEditProfile: () -> Unit = {}) {
     val user by vm.currentUser.collectAsState()
-    val isDark by vm.isDark.collectAsState()
+    val themeMode by vm.themeMode.collectAsState()
     val context = LocalContext.current
     var showLastSeen by remember(user?.showLastSeen) { mutableStateOf(user?.showLastSeen ?: true) }
     val versionName = remember {
@@ -91,8 +91,9 @@ fun SettingsScreen(vm: KlicViewModel, onEditProfile: () -> Unit = {}) {
             )
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ThemeChip(label = "Dark",  isSelected = isDark)  { vm.setDark(true) }
-                ThemeChip(label = "Light", isSelected = !isDark) { vm.setDark(false) }
+                ThemeChip(label = "Light",  isSelected = themeMode == "light")  { vm.setThemeMode("light") }
+                ThemeChip(label = "Dark",   isSelected = themeMode == "dark")   { vm.setThemeMode("dark") }
+                ThemeChip(label = "System", isSelected = themeMode == "system") { vm.setThemeMode("system") }
             }
         }
 

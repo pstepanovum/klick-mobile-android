@@ -43,7 +43,7 @@ class AppContainer(app: Application) {
     val activeCallConversationId = MutableStateFlow<String?>(null)
 
     private val prefs = app.getSharedPreferences("klic_prefs", android.content.Context.MODE_PRIVATE)
-    var isDark: Boolean
-        get() = prefs.getBoolean("dark_theme", true)
-        set(value) { prefs.edit().putBoolean("dark_theme", value).apply() }
+    var themeMode: String
+        get() = prefs.getString("theme_mode", "system") ?: "system"
+        set(value) { prefs.edit().putString("theme_mode", value).apply() }
 }

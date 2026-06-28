@@ -31,7 +31,7 @@ class KlicViewModel(
     val currentUser = MutableStateFlow<User?>(null)
     val isAuthenticated = MutableStateFlow(false)
     val error = MutableStateFlow<String?>(null)
-    val isDark = MutableStateFlow(container.isDark)
+    val themeMode = MutableStateFlow(container.themeMode)
 
     val conversations = MutableStateFlow<List<Conversation>>(emptyList())
     val messages = MutableStateFlow<List<Message>>(emptyList())
@@ -100,9 +100,9 @@ class KlicViewModel(
         isAuthenticated.value = false
     }
 
-    fun setDark(value: Boolean) {
-        isDark.value = value
-        container.isDark = value
+    fun setThemeMode(mode: String) {
+        themeMode.value = mode
+        container.themeMode = mode
     }
 
     fun callFriendDirect(userId: String, kind: String, peerName: String, onStarted: () -> Unit) =

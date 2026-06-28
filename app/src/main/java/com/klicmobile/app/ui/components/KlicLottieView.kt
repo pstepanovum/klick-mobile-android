@@ -2,11 +2,12 @@ package com.klicmobile.app.ui.components
 
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import com.airbnb.lottie.LottieProperty
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
@@ -20,7 +21,7 @@ import com.airbnb.lottie.compose.rememberLottieDynamicProperty
 fun KlicLottieView(name: String, modifier: Modifier = Modifier) {
     val composition by rememberLottieComposition(LottieCompositionSpec.Asset("animations/$name.json"))
     val progress by animateLottieCompositionAsState(composition, iterations = LottieConstants.IterateForever)
-    val isDark = isSystemInDarkTheme()
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
     val whiteFilter = remember { PorterDuffColorFilter(android.graphics.Color.WHITE, PorterDuff.Mode.SRC_ATOP) }
     val colorFilterProp = rememberLottieDynamicProperty(

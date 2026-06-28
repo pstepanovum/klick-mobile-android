@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -91,7 +92,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             val vm: KlicViewModel = viewModel(factory = factory(container))
             val isAuthed by vm.isAuthenticated.collectAsState()
-            val isDark by vm.isDark.collectAsState()
+            val themeMode by vm.themeMode.collectAsState()
+            val systemDark = isSystemInDarkTheme()
+            val isDark = when (themeMode) {
+                "light"  -> false
+                "dark"   -> true
+                else     -> systemDark
+            }
             val context = LocalContext.current
             LaunchedEffect(isAuthed) {
                 if (isAuthed) CallSignalingService.start(context) else CallSignalingService.stop(context)
