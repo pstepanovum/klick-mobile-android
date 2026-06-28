@@ -1,6 +1,9 @@
 package com.klicmobile.app.calling
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -38,6 +41,17 @@ class IncomingCallActivity : ComponentActivity() {
 
     companion object {
         const val ACTION_ACCEPT_CALL = "com.klicmobile.app.ACCEPT_CALL"
+        const val ACTION_CALL_ENDED = "com.klicmobile.app.CALL_ENDED"
+    }
+
+    private var callId: String? = null
+    private val callEndedReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == ACTION_CALL_ENDED && intent.getStringExtra("callId") == callId) {
+                CallNotifications.cancelIncomingCall(this@IncomingCallActivity)
+                finish()
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,6 +62,12 @@ class IncomingCallActivity : ComponentActivity() {
         }
         val invite = CallInvite.fromIntent(intent)
         if (invite == null) { finish(); return }
+        callId = invite.callId
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(callEndedReceiver, IntentFilter(ACTION_CALL_ENDED), RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(callEndedReceiver, IntentFilter(ACTION_CALL_ENDED))
+        }
 
         setContent {
             KlicTheme {
@@ -59,6 +79,11 @@ class IncomingCallActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onDestroy() {
+        runCatching { unregisterReceiver(callEndedReceiver) }
+        super.onDestroy()
     }
 
     private fun accept(invite: CallInvite) {

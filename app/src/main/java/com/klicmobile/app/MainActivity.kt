@@ -187,8 +187,10 @@ class MainActivity : ComponentActivity() {
                 composable("active_call") {
                     val call by vm.activeCall.collectAsState()
                     val peer by vm.callPeerName.collectAsState()
-                    call?.let {
-                        CallScreen(vm, it, peerName = peer) { navController.popBackStack() }
+                    if (call == null) {
+                        LaunchedEffect(Unit) { navController.popBackStack() }
+                    } else {
+                        CallScreen(vm, call!!, peerName = peer) { navController.popBackStack() }
                     }
                 }
             }

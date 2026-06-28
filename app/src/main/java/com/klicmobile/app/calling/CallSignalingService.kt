@@ -41,6 +41,23 @@ class CallSignalingService : Service() {
                 CallNotifications.showIncomingCall(this@CallSignalingService, invite.toCallInvite())
             }
         }
+        scope.launch {
+            socket.callEvents.collect { event ->
+                if (
+                    event.type == SocketService.CallEvent.Type.CANCEL ||
+                    event.type == SocketService.CallEvent.Type.END ||
+                    event.type == SocketService.CallEvent.Type.DECLINE
+                ) {
+                    CallNotifications.cancelIncomingCall(this@CallSignalingService)
+                    sendBroadcast(
+                        Intent(IncomingCallActivity.ACTION_CALL_ENDED).apply {
+                            setPackage(packageName)
+                            putExtra("callId", event.callId)
+                        }
+                    )
+                }
+            }
+        }
         return START_STICKY
     }
 

@@ -29,6 +29,7 @@ class CallManager(private val appContext: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     suspend fun join(url: String, token: String, video: Boolean) {
+        leave()
         val room = LiveKit.create(appContext).also { this.room = it }
         scope.launch { room.events.collect { refreshTracks() } }
         room.connect(url, token)
@@ -50,6 +51,7 @@ class CallManager(private val appContext: Context) {
         val next = !cameraEnabled.value
         room?.localParticipant?.setCameraEnabled(next)
         cameraEnabled.value = next
+        if (!next) localVideoTrack.value = null
         refreshTracks()
     }
 

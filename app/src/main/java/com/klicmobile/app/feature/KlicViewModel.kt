@@ -61,6 +61,7 @@ class KlicViewModel(
     private var openConversationId: String? = null
     private var activeCallOutgoing = false
     private var ringTimeoutJob: Job? = null
+    private val finishingCallIds = mutableSetOf<String>()
 
     fun login(username: String, password: String) = launchAuth {
         repo.login(username, password).let { currentUser.value = it }
@@ -85,6 +86,7 @@ class KlicViewModel(
 
     fun callFriendDirect(userId: String, kind: String, peerName: String, onStarted: () -> Unit) =
         viewModelScope.launch {
+            if (activeCall.value != null) return@launch
             callPeerName.value = peerName
             runCatching {
                 val convo = repo.openConversation(userId)
@@ -143,6 +145,7 @@ class KlicViewModel(
     }
 
     fun startCall(conversationId: String, kind: String, peerName: String) = viewModelScope.launch {
+        if (activeCall.value != null) return@launch
         callPeerName.value = peerName
         runCatching { repo.startCall(conversationId, kind) }
             .onSuccess { startActiveCall(it, peerName, outgoing = true) }
@@ -163,8 +166,14 @@ class KlicViewModel(
 
     fun endCall() {
         val id = activeCall.value?.callId
+        if (id != null) {
+            socket.emit(
+                if (callStatus.value == "Connected") "call:end" else "call:cancel",
+                buildJsonObject { put("callId", id) },
+            )
+            viewModelScope.launch { repo.endCall(id) }
+        }
         finishCall(callId = id)
-        if (id != null) viewModelScope.launch { repo.endCall(id) }
     }
 
     fun onCallMediaJoined(callId: String) {
@@ -194,6 +203,8 @@ class KlicViewModel(
     }
 
     private fun startActiveCall(session: CallSession, peerName: String, outgoing: Boolean) {
+        if (activeCall.value != null && activeCall.value?.callId != session.callId) return
+        finishingCallIds.remove(session.callId)
         activeCallOutgoing = outgoing
         callPeerName.value = peerName
         callStatus.value = if (outgoing) "Calling..." else "Connecting..."
@@ -238,13 +249,18 @@ class KlicViewModel(
     }
 
     private fun finishCall(delayMs: Long = 0, callId: String? = activeCall.value?.callId) {
+        val id = callId ?: activeCall.value?.callId
+        if (id != null && !finishingCallIds.add(id)) return
         cancelRingTimeout()
-        viewModelScope.launch {
-            if (delayMs > 0) delay(delayMs)
-            if (callId != null && activeCall.value?.callId != callId) return@launch
-            callManager.leave()
+        if (id == null || activeCall.value?.callId == id) {
             activeCall.value = null
             activeCallOutgoing = false
+            callStatus.value = "Ended"
+        }
+        viewModelScope.launch {
+            if (delayMs > 0) delay(delayMs)
+            callManager.leave()
+            if (id != null) finishingCallIds.remove(id)
         }
     }
 
