@@ -1,7 +1,11 @@
 package com.klicmobile.app.calling
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.MediaPlayer
+import android.net.Uri
+import com.klicmobile.app.R
 import com.twilio.audioswitch.AudioDevice
 import io.livekit.android.AudioOptions
 import io.livekit.android.AudioType
@@ -54,6 +58,7 @@ class CallManager(
     private var joinJob: Job? = null
     private var leaving = false
     private var audioHandler: AudioSwitchHandler? = null
+    private var ringbackPlayer: MediaPlayer? = null
     private var currentCallId: String? = null
 
     /**
@@ -212,6 +217,7 @@ class CallManager(
         val hadRoom = room != null
         leaving = true
         isReconnecting.value = false
+        stopRingback()
         if (hadRoom) diagnostic("livekit.leave.start", callId)
         joinJob?.cancel()
         joinJob = null
@@ -285,6 +291,32 @@ class CallManager(
             speakerOn.value = it is AudioDevice.Speakerphone
             diagnostic("livekit.audio.speaker", currentCallId, if (it is AudioDevice.Speakerphone) "on" else "off")
         }
+    }
+
+    /** Outgoing ringback — the looping tone the caller hears while "Calling…" and waiting for the
+     *  callee to answer. Plays as a call-signalling stream; stopped the moment the call connects. */
+    fun startRingback() {
+        if (ringbackPlayer != null) return
+        runCatching {
+            ringbackPlayer = MediaPlayer().apply {
+                setDataSource(appContext, Uri.parse("android.resource://${appContext.packageName}/${R.raw.ring}"))
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION_SIGNALLING)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                isLooping = true
+                prepare()
+                start()
+            }
+            diagnostic("livekit.ringback.start", currentCallId)
+        }.onFailure { diagnostic("livekit.ringback.failed", currentCallId, it.message) }
+    }
+
+    fun stopRingback() {
+        runCatching { ringbackPlayer?.stop(); ringbackPlayer?.release() }
+        ringbackPlayer = null
     }
 
     private fun preferVideoSpeaker(handler: AudioSwitchHandler, callId: String, reason: String) {

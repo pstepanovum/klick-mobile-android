@@ -431,7 +431,8 @@ class KlicViewModel(
         callPeerName.value = peerName
         callStatus.value = if (outgoing) "Calling..." else "Connecting..."
         activeCall.value = session
-        if (outgoing) startRingTimeout(session.callId) else cancelRingTimeout()
+        // Play the outgoing ringback while we wait for the callee to answer (stopped on connect/end).
+        if (outgoing) { startRingTimeout(session.callId); callManager.startRingback() } else cancelRingTimeout()
         // Keep the call alive (mic/camera + process priority) while backgrounded.
         OngoingCallService.start(container.appContext, peerName, isVideo = session.kind == "VIDEO")
     }
@@ -459,6 +460,7 @@ class KlicViewModel(
         when (event.type) {
             SocketService.CallEvent.Type.ACCEPT -> {
                 cancelRingTimeout()
+                callManager.stopRingback()
                 callStatus.value = "Connected"
             }
             SocketService.CallEvent.Type.DECLINE -> {
@@ -474,6 +476,7 @@ class KlicViewModel(
         val id = callId ?: activeCall.value?.callId
         if (id != null && !finishingCallIds.add(id)) return
         cancelRingTimeout()
+        callManager.stopRingback()
         if (id == null || activeCall.value?.callId == id) {
             activeCall.value = null
             activeCallOutgoing = false
