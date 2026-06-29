@@ -14,8 +14,8 @@ android {
         applicationId = "com.klicmobile.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 21
-        versionName = "0.3.0"
+        versionCode = 22
+        versionName = "0.3.1"
     }
 
     buildTypes {
