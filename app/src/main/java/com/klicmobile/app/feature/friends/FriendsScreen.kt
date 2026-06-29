@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -38,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.klicmobile.app.data.Conversation
 import com.klicmobile.app.data.FriendRequest
 import com.klicmobile.app.data.Network
 import com.klicmobile.app.data.User
@@ -48,12 +50,19 @@ import com.klicmobile.app.ui.components.KlicTextField
 import com.klicmobile.app.ui.theme.KlicIcons
 
 @Composable
-fun FriendsScreen(vm: KlicViewModel, onOpenProfile: (String) -> Unit) {
+fun FriendsScreen(
+    vm: KlicViewModel,
+    onOpenProfile: (String) -> Unit,
+    onOpenChat: (Conversation) -> Unit,
+) {
     val friends by vm.friends.collectAsState()
     val requests by vm.friendRequests.collectAsState()
     val status by vm.friendStatus.collectAsState()
     val presenceMap by vm.presence.collectAsState()
     var username by remember { mutableStateOf("") }
+    var creatingGroup by remember { mutableStateOf(false) }
+    var groupTitle by remember { mutableStateOf("") }
+    var selectedFriendIds by remember { mutableStateOf(setOf<String>()) }
 
     LaunchedEffect(Unit) { vm.loadFriends() }
 
@@ -95,6 +104,63 @@ fun FriendsScreen(vm: KlicViewModel, onOpenProfile: (String) -> Unit) {
             Spacer(Modifier.size(20.dp))
         }
 
+        item {
+            Text("Create group", style = MaterialTheme.typography.titleMedium)
+            Row(
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                KlicTextField(
+                    groupTitle,
+                    { groupTitle = it },
+                    "Group name",
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(
+                    onClick = {
+                        if (creatingGroup && selectedFriendIds.size >= 2 && groupTitle.isNotBlank()) {
+                            vm.createGroupConversation(groupTitle, selectedFriendIds.toList()) { convo ->
+                                creatingGroup = false
+                                groupTitle = ""
+                                selectedFriendIds = emptySet()
+                                onOpenChat(convo)
+                            }
+                        } else {
+                            creatingGroup = !creatingGroup
+                            if (!creatingGroup) selectedFriendIds = emptySet()
+                        }
+                    },
+                    modifier = Modifier.size(50.dp),
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
+                ) {
+                    Icon(
+                        painter = painterResource(if (creatingGroup) KlicIcons.check else KlicIcons.add),
+                        contentDescription = if (creatingGroup) "Create group" else "Select friends",
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+            Text(
+                if (creatingGroup) {
+                    when {
+                        selectedFriendIds.isEmpty() -> "Select at least two friends below."
+                        selectedFriendIds.size == 1 -> "Select one more friend."
+                        else -> "${selectedFriendIds.size} selected"
+                    }
+                } else {
+                    "Pick friends and create a shared chat."
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Spacer(Modifier.size(20.dp))
+        }
+
         if (requests.isNotEmpty()) {
             item { SectionTitle("Requests") }
             items(requests) { req ->
@@ -119,7 +185,16 @@ fun FriendsScreen(vm: KlicViewModel, onOpenProfile: (String) -> Unit) {
         }
         items(friends) { friend ->
             val online = presenceMap[friend.id]?.online == true
-            FriendRow(friend, online) {
+            FriendRow(
+                friend = friend,
+                online = online,
+                selectable = creatingGroup,
+                selected = friend.id in selectedFriendIds,
+                onToggleSelected = {
+                    selectedFriendIds =
+                        if (friend.id in selectedFriendIds) selectedFriendIds - friend.id else selectedFriendIds + friend.id
+                },
+            ) {
                 vm.openConversationWith(friend.id) { convo -> onOpenProfile(convo.id) }
             }
         }
@@ -193,12 +268,24 @@ private fun RequestRow(req: FriendRequest, onAccept: () -> Unit, onDecline: () -
 
 @Composable
 private fun FriendRow(friend: User, online: Boolean, onClick: () -> Unit) {
+    FriendRow(friend, online, selectable = false, selected = false, onToggleSelected = {}, onClick = onClick)
+}
+
+@Composable
+private fun FriendRow(
+    friend: User,
+    online: Boolean,
+    selectable: Boolean,
+    selected: Boolean,
+    onToggleSelected: () -> Unit,
+    onClick: () -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
+            .clickable(onClick = if (selectable) onToggleSelected else onClick)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -218,11 +305,15 @@ private fun FriendRow(friend: User, online: Boolean, onClick: () -> Unit) {
             Text(friend.displayName, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
             Text("@${friend.username}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = "View profile",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(22.dp),
-        )
+        if (selectable) {
+            Checkbox(checked = selected, onCheckedChange = { onToggleSelected() })
+        } else {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = "View profile",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+        }
     }
 }

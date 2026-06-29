@@ -116,8 +116,17 @@ fun ChatScreen(
     val presenceMap by vm.presence.collectAsState()
     var draft by remember { mutableStateOf("") }
     val peer = conversation.members.firstOrNull()
-    val title = peer?.displayName ?: "Chat"
-    val headerSubtitle = peer?.id?.let { presenceSubtitle(presenceMap[it]) }
+    val isDirect = conversation.type == "DIRECT"
+    val title = when {
+        !conversation.title.isNullOrBlank() -> conversation.title
+        isDirect -> peer?.displayName ?: "Chat"
+        else -> conversation.members.joinToString(", ") { it.displayName }.ifBlank { "Group" }
+    }
+    val headerSubtitle = when {
+        isDirect -> peer?.id?.let { presenceSubtitle(presenceMap[it]) }
+        conversation.members.isNotEmpty() -> "${conversation.members.size + 1} members"
+        else -> null
+    }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -136,7 +145,7 @@ fun ChatScreen(
     var menuTarget by remember { mutableStateOf<Message?>(null) }
     var deleteTarget by remember { mutableStateOf<Message?>(null) }
     var viewerUrl by remember { mutableStateOf<String?>(null) }
-    val peerTyping = typingMap[conversation.id]?.let { System.currentTimeMillis() - it < 6000L } == true
+    val peerTyping = isDirect && typingMap[conversation.id]?.let { System.currentTimeMillis() - it < 6000L } == true
     val displaySubtitle = if (peerTyping) "typing…" else headerSubtitle
 
     // Pagination
@@ -231,7 +240,7 @@ fun ChatScreen(
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable(onClick = onOpenProfile),
+                        modifier = if (isDirect) Modifier.clickable(onClick = onOpenProfile) else Modifier,
                     ) {
                         AvatarView(url = peer?.avatarUrl, name = title, size = 34.dp)
                         Column(Modifier.padding(start = 10.dp)) {
@@ -254,11 +263,13 @@ fun ChatScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { vm.startCall(conversation.id, "AUDIO", title); onCall("AUDIO") }) {
-                        Icon(Icons.Filled.Call, contentDescription = "Voice call", modifier = Modifier.size(22.dp))
-                    }
-                    IconButton(onClick = { vm.startCall(conversation.id, "VIDEO", title); onCall("VIDEO") }) {
-                        Icon(Icons.Filled.Videocam, contentDescription = "Video call", modifier = Modifier.size(24.dp))
+                    if (isDirect) {
+                        IconButton(onClick = { vm.startCall(conversation.id, "AUDIO", title); onCall("AUDIO") }) {
+                            Icon(Icons.Filled.Call, contentDescription = "Voice call", modifier = Modifier.size(22.dp))
+                        }
+                        IconButton(onClick = { vm.startCall(conversation.id, "VIDEO", title); onCall("VIDEO") }) {
+                            Icon(Icons.Filled.Videocam, contentDescription = "Video call", modifier = Modifier.size(24.dp))
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),

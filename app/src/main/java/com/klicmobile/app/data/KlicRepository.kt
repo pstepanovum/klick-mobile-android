@@ -120,7 +120,11 @@ class KlicRepository(
     suspend fun sendFriendRequest(userId: String) { api.sendFriendRequest(mapOf("userId" to userId)) }
     suspend fun acceptFriendRequest(id: String) { api.acceptFriendRequest(id) }
     suspend fun declineFriendRequest(id: String) { api.declineFriendRequest(id) }
-    suspend fun openConversation(userId: String): Conversation = api.openConversation(mapOf("userId" to userId))
+    suspend fun openConversation(userId: String): Conversation =
+        api.createConversation(CreateConversationRequest(userId = userId))
+
+    suspend fun createGroupConversation(title: String, userIds: List<String>): Conversation =
+        api.createConversation(CreateConversationRequest(title = title, userIds = userIds))
 
     suspend fun conversations(): List<Conversation> = api.conversations()
     suspend fun messages(conversationId: String, before: String? = null): List<Message> =

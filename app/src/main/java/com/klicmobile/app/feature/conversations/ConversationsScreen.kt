@@ -53,8 +53,11 @@ fun ConversationsScreen(vm: KlicViewModel, onOpenChat: (Conversation) -> Unit) {
     LaunchedEffect(Unit) { vm.loadConversations() }
 
     val filtered = if (searchText.isEmpty()) conversations else conversations.filter { convo ->
-        (convo.members.firstOrNull()?.displayName?.contains(searchText, ignoreCase = true) == true) ||
-        (convo.members.firstOrNull()?.username?.contains(searchText, ignoreCase = true) == true) ||
+        conversationTitle(convo).contains(searchText, ignoreCase = true) ||
+        convo.members.any {
+            it.displayName.contains(searchText, ignoreCase = true) ||
+                it.username.contains(searchText, ignoreCase = true)
+        } ||
         (convo.lastMessage?.body?.contains(searchText, ignoreCase = true) == true)
     }
 
@@ -86,7 +89,8 @@ fun ConversationsScreen(vm: KlicViewModel, onOpenChat: (Conversation) -> Unit) {
                 )
                 LazyColumn(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                     items(filtered) { convo ->
-                        val online = presenceMap[convo.members.firstOrNull()?.id]?.online == true
+                        val online = convo.type == "DIRECT" &&
+                            presenceMap[convo.members.firstOrNull()?.id]?.online == true
                         ConversationRow(convo, online) { onOpenChat(convo) }
                     }
                 }
@@ -98,7 +102,7 @@ fun ConversationsScreen(vm: KlicViewModel, onOpenChat: (Conversation) -> Unit) {
 @Composable
 private fun ConversationRow(conversation: Conversation, online: Boolean, onClick: () -> Unit) {
     val member = conversation.members.firstOrNull()
-    val title = member?.displayName ?: "Direct"
+    val title = conversationTitle(conversation)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -122,6 +126,15 @@ private fun ConversationRow(conversation: Conversation, online: Boolean, onClick
             }
             Column(Modifier.padding(start = 14.dp).weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                if (conversation.type == "GROUP") {
+                    Text(
+                        groupMemberSummary(conversation),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 Text(
                     lastMessagePreview(conversation.lastMessage),
                     style = MaterialTheme.typography.bodyMedium,
@@ -171,6 +184,16 @@ private fun ConversationRow(conversation: Conversation, online: Boolean, onClick
         )
     }
 }
+
+private fun conversationTitle(conversation: Conversation): String =
+    when {
+        conversation.type == "GROUP" && !conversation.title.isNullOrBlank() -> conversation.title
+        conversation.type == "GROUP" -> conversation.members.joinToString(", ") { it.displayName }.ifBlank { "Group" }
+        else -> conversation.members.firstOrNull()?.displayName ?: "Direct"
+    }
+
+private fun groupMemberSummary(conversation: Conversation): String =
+    conversation.members.joinToString(", ") { it.displayName }.ifBlank { "No members yet" }
 
 /** Last-message stamp for the chat list: clock time today (e.g. "3:26 PM"), "MM/dd" earlier this
  *  year, "MM/dd/yy" before that — or null if unknown. */

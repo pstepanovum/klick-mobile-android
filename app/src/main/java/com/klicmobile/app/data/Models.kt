@@ -76,9 +76,17 @@ data class Member(
 data class Conversation(
     val id: String,
     val type: String,
+    val title: String? = null,
     val members: List<Member> = emptyList(),
     val lastMessage: Message? = null,
     val unreadCount: Int = 0,
+)
+
+@Serializable
+data class CreateConversationRequest(
+    val userId: String? = null,
+    val title: String? = null,
+    val userIds: List<String>? = null,
 )
 
 @Serializable

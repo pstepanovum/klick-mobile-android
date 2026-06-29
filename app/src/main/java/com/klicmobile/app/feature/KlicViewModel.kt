@@ -216,6 +216,16 @@ class KlicViewModel(
         }
     }
 
+    fun createGroupConversation(title: String, userIds: List<String>, onReady: (Conversation) -> Unit) =
+        viewModelScope.launch {
+            runCatching { repo.createGroupConversation(title.trim(), userIds.distinct()) }.onSuccess { c ->
+                conversations.value = listOf(c) + conversations.value.filterNot { it.id == c.id }
+                onReady(c)
+            }.onFailure {
+                error.value = "Couldn't create group chat. Try again."
+            }
+        }
+
     fun openChat(conversationId: String) = viewModelScope.launch {
         openConversationId = conversationId
         replyingTo.value = null

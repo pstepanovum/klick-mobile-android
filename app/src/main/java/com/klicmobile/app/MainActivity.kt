@@ -279,7 +279,11 @@ class MainActivity : ComponentActivity() {
                     ConversationsScreen(vm) { convo -> navController.navigate("chat/${convo.id}") }
                 }
                 composable("friends") {
-                    FriendsScreen(vm) { conversationId -> navController.navigate("profile/$conversationId") }
+                    FriendsScreen(
+                        vm,
+                        onOpenProfile = { conversationId -> navController.navigate("profile/$conversationId") },
+                        onOpenChat = { convo -> navController.navigate("chat/${convo.id}") },
+                    )
                 }
                 composable("call") {
                     CallDialScreen(vm)
@@ -298,7 +302,9 @@ class MainActivity : ComponentActivity() {
                             conversation = convo,
                             onBack = { navController.popBackStack() },
                             onCall = {}, // navigation is reactive on activeCall (see Home)
-                            onOpenProfile = { navController.navigate("profile/${convo.id}") },
+                            onOpenProfile = {
+                                if (convo.type == "DIRECT") navController.navigate("profile/${convo.id}")
+                            },
                         )
                     }
                 }

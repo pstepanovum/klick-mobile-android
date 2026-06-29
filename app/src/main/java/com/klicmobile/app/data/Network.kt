@@ -42,7 +42,7 @@ interface KlicApi {
     suspend fun conversations(): List<Conversation>
 
     @POST("conversations")
-    suspend fun openConversation(@Body body: Map<String, String>): Conversation
+    suspend fun createConversation(@Body body: CreateConversationRequest): Conversation
 
     @GET("conversations/{id}/messages")
     suspend fun messages(
