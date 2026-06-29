@@ -34,6 +34,7 @@ class KlicApplication : Application(), ImageLoaderFactory {
 }
 
 class AppContainer(app: Application) {
+    val appContext = app.applicationContext
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val tokenStore = TokenStore(app)
 
@@ -53,8 +54,19 @@ class AppContainer(app: Application) {
      *  the server already collapses simultaneous calls into one. Null when not in a call. */
     val activeCallConversationId = MutableStateFlow<String?>(null)
 
+    /** Hang-up requests from outside the ViewModel (e.g. the ongoing-call notification action).
+     *  The ViewModel collects this and runs its normal end-call teardown. */
+    private val _callHangup = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val callHangup: SharedFlow<Unit> = _callHangup
+    fun requestHangup() { _callHangup.tryEmit(Unit) }
+
     private val prefs = app.getSharedPreferences("klic_prefs", android.content.Context.MODE_PRIVATE)
     var themeMode: String
         get() = prefs.getString("theme_mode", "system") ?: "system"
         set(value) { prefs.edit().putString("theme_mode", value).apply() }
+
+    /** Whether we've already shown the one-time "reliable calls" prompt after sign-in. */
+    var reliabilityPrompted: Boolean
+        get() = prefs.getBoolean("reliability_prompted", false)
+        set(value) { prefs.edit().putBoolean("reliability_prompted", value).apply() }
 }

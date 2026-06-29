@@ -42,6 +42,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.klicmobile.app.calling.CallReliability
 import com.klicmobile.app.feature.KlicViewModel
 import com.klicmobile.app.ui.components.AvatarView
 import com.klicmobile.app.ui.components.KlicLottieView
@@ -160,6 +161,33 @@ fun SettingsScreen(vm: KlicViewModel, onEditProfile: () -> Unit = {}) {
             }
             Spacer(Modifier.height(10.dp))
         }
+
+        // Reliable calls — battery-optimization exemption (OEM killers) + full-screen intent.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                .clickable { CallReliability.requestDisableBatteryOptimization(context) }
+                .padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Reliable calls", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                Text(
+                    "Allow Klic to run in the background so calls ring on time and don't drop.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
 
         Button(
             onClick = { vm.logout() },

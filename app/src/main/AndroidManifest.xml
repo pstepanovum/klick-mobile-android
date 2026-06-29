@@ -9,8 +9,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
@@ -51,6 +55,13 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- Keeps an active voice/video call alive (mic/camera capture + process priority)
+             while the app is backgrounded; self-stops when the call ends. -->
+        <service
+            android:name=".calling.OngoingCallService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|camera" />
+
         <!-- FCM: high-priority data messages ring incoming calls even when killed/Dozing -->
         <service
             android:name=".calling.KlicMessagingService"
@@ -63,6 +74,11 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="calls" />
+
+        <!-- Handles decline / hang-up actions from call notifications -->
+        <receiver
+            android:name=".calling.CallActionReceiver"
+            android:exported="false" />
 
         <!-- Provides content URIs for camera-captured images -->
         <provider

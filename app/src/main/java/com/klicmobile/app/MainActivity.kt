@@ -9,11 +9,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -37,6 +39,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.klicmobile.app.calling.CallInvite
+import com.klicmobile.app.calling.CallReliability
 import com.klicmobile.app.calling.CallSignalingService
 import com.klicmobile.app.calling.IncomingCallActivity
 import com.klicmobile.app.feature.KlicViewModel
@@ -104,11 +107,38 @@ class MainActivity : ComponentActivity() {
                 if (isAuthed) CallSignalingService.start(context) else CallSignalingService.stop(context)
             }
             var showWelcome by remember { mutableStateOf(true) }
+            var showReliabilityDialog by remember { mutableStateOf(false) }
+            // Once after sign-in, nudge the user to allow reliable background calls.
+            LaunchedEffect(isAuthed) {
+                if (isAuthed && !container.reliabilityPrompted &&
+                    CallReliability.needsAttention(this@MainActivity)
+                ) {
+                    showReliabilityDialog = true
+                }
+            }
             KlicTheme(isDark = isDark) {
                 when {
                     isAuthed       -> Home(vm)
                     showWelcome    -> WelcomeScreen { showWelcome = false }
                     else           -> AuthScreen(vm)
+                }
+                if (showReliabilityDialog) {
+                    ReliabilityDialog(
+                        onAllow = {
+                            if (CallReliability.isBatteryOptimized(this@MainActivity)) {
+                                CallReliability.requestDisableBatteryOptimization(this@MainActivity)
+                            }
+                            if (!CallReliability.canUseFullScreenIntent(this@MainActivity)) {
+                                CallReliability.requestFullScreenIntent(this@MainActivity)
+                            }
+                            container.reliabilityPrompted = true
+                            showReliabilityDialog = false
+                        },
+                        onDismiss = {
+                            container.reliabilityPrompted = true
+                            showReliabilityDialog = false
+                        },
+                    )
                 }
             }
         }
@@ -225,6 +255,22 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    @Composable
+    private fun ReliabilityDialog(onAllow: () -> Unit, onDismiss: () -> Unit) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Reliable calls") },
+            text = {
+                Text(
+                    "To ring on time and keep calls from dropping in the background, allow Klic " +
+                        "to run without battery restrictions. You can change this later in Settings.",
+                )
+            },
+            confirmButton = { TextButton(onClick = onAllow) { Text("Allow") } },
+            dismissButton = { TextButton(onClick = onDismiss) { Text("Not now") } },
+        )
     }
 
     private fun factory(container: AppContainer) = object : Factory {

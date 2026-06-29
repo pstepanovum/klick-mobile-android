@@ -3,6 +3,7 @@ package com.klicmobile.app.feature
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.klicmobile.app.calling.CallManager
+import com.klicmobile.app.calling.OngoingCallService
 import com.klicmobile.app.data.CallSession
 import com.klicmobile.app.data.Conversation
 import com.klicmobile.app.data.FriendRequest
@@ -103,6 +104,9 @@ class KlicViewModel(
                     finishCall(callId = id)
                 }
             }
+        }
+        viewModelScope.launch {
+            container.callHangup.collect { endCall() }
         }
         viewModelScope.launch {
             container.sessionExpired.collect { handleSessionExpired() }
@@ -404,6 +408,8 @@ class KlicViewModel(
         callStatus.value = if (outgoing) "Calling..." else "Connecting..."
         activeCall.value = session
         if (outgoing) startRingTimeout(session.callId) else cancelRingTimeout()
+        // Keep the call alive (mic/camera + process priority) while backgrounded.
+        OngoingCallService.start(container.appContext, peerName, isVideo = session.kind == "VIDEO")
     }
 
     private fun startRingTimeout(callId: String) {
@@ -449,6 +455,7 @@ class KlicViewModel(
             activeCallOutgoing = false
             callStatus.value = "Ended"
             container.activeCallConversationId.value = null
+            OngoingCallService.stop(container.appContext)
         }
         viewModelScope.launch {
             if (delayMs > 0) delay(delayMs)
