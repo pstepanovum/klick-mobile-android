@@ -1,13 +1,17 @@
 package com.klicmobile.app.feature.call
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -18,6 +22,7 @@ import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.PhoneInTalk
 import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.Videocam
@@ -30,12 +35,20 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.klicmobile.app.calling.LiveKitVideo
 import com.klicmobile.app.data.CallSession
@@ -44,6 +57,7 @@ import com.klicmobile.app.feature.KlicViewModel
 import com.klicmobile.app.ui.components.AvatarView
 import com.klicmobile.app.ui.components.CircleControl
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 @Composable
 fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: () -> Unit) {
@@ -77,17 +91,26 @@ fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: ()
     }
 
     val pip = LocalPipController.current
+    var localFullscreen by remember { mutableStateOf(false) }
+    var cardOffset by remember { mutableStateOf(Offset.Zero) }
+    val density = LocalDensity.current
 
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        val hasRemoteVideo = shouldShowVideo && remoteVideo != null
-        if (hasRemoteVideo) {
-            LiveKitVideo(manager.room, remoteVideo, Modifier.fillMaxSize())
+    // Pick which feed is full-screen and which rides in the draggable card (WhatsApp-style swap).
+    val localTrack = if (cameraEnabled) localVideo else null
+    val primaryIsLocal = localFullscreen && localTrack != null
+    val primaryTrack = if (primaryIsLocal) localTrack else remoteVideo
+    val secondaryTrack = if (primaryIsLocal) remoteVideo else localTrack
+    val hasPrimaryVideo = shouldShowVideo && primaryTrack != null
+
+    BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        if (hasPrimaryVideo) {
+            LiveKitVideo(manager.room, primaryTrack, Modifier.fillMaxSize())
         }
 
         if (pip.isInPipMode) {
             // Compacted into a PiP window: video only, no chrome. Fall back to a centred avatar
-            // while the remote isn't sending video.
-            if (!hasRemoteVideo) {
+            // while there's no full-screen video.
+            if (!hasPrimaryVideo) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     AvatarView(url = peerId?.let { Network.avatarUrl(it) }, name = peerName, size = 64.dp)
                 }
@@ -110,7 +133,7 @@ fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: ()
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (!hasRemoteVideo) {
+                    if (!hasPrimaryVideo) {
                         AvatarView(
                             url = peerId?.let { Network.avatarUrl(it) },
                             name = peerName,
@@ -163,11 +186,36 @@ fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: ()
                 }
             }
 
-            if (shouldShowVideo && cameraEnabled && localVideo != null) {
-                LiveKitVideo(
-                    manager.room, localVideo,
-                    Modifier.padding(20.dp).size(110.dp, 160.dp).clip(RoundedCornerShape(18.dp))
-                        .align(Alignment.TopEnd),
+        }
+
+        // Draggable, tap-to-swap picture-in-picture card for the secondary feed.
+        if (!pip.isInPipMode && shouldShowVideo && secondaryTrack != null) {
+            val leftLimitPx = with(density) { (maxWidth - 150.dp).toPx() }.coerceAtLeast(0f)
+            val downLimitPx = with(density) { (maxHeight - 320.dp).toPx() }.coerceAtLeast(0f)
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .offset { IntOffset(cardOffset.x.roundToInt(), cardOffset.y.roundToInt()) }
+                    .padding(20.dp)
+                    .size(110.dp, 160.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, drag ->
+                            change.consume()
+                            cardOffset = Offset(
+                                (cardOffset.x + drag.x).coerceIn(-leftLimitPx, 0f),
+                                (cardOffset.y + drag.y).coerceIn(0f, downLimitPx),
+                            )
+                        }
+                    }
+                    .clickable { localFullscreen = !localFullscreen },
+            ) {
+                LiveKitVideo(manager.room, secondaryTrack, Modifier.fillMaxSize())
+                Icon(
+                    imageVector = Icons.Filled.OpenInFull,
+                    contentDescription = "Expand",
+                    tint = Color.White,
+                    modifier = Modifier.align(Alignment.TopStart).padding(6.dp).size(16.dp),
                 )
             }
         }
