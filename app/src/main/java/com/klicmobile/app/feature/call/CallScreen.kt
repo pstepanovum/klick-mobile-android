@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material3.Icon
@@ -72,66 +73,90 @@ fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: ()
         onDispose { view.keepScreenOn = false }
     }
 
+    val pip = LocalPipController.current
+
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        if (shouldShowVideo && remoteVideo != null) {
+        val hasRemoteVideo = shouldShowVideo && remoteVideo != null
+        if (hasRemoteVideo) {
             LiveKitVideo(manager.room, remoteVideo, Modifier.fillMaxSize())
         }
 
-        Column(
-            Modifier.fillMaxSize().padding(vertical = 56.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (!(shouldShowVideo && remoteVideo != null)) {
-                    AvatarView(
-                        url = peerId?.let { Network.avatarUrl(it) },
-                        name = peerName,
-                        size = 120.dp,
-                    )
-                    Spacer(Modifier.height(16.dp))
+        if (pip.isInPipMode) {
+            // Compacted into a PiP window: video only, no chrome. Fall back to a centred avatar
+            // while the remote isn't sending video.
+            if (!hasRemoteVideo) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    AvatarView(url = peerId?.let { Network.avatarUrl(it) }, name = peerName, size = 64.dp)
                 }
-                Text(peerName, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
-                Text(
-                    callStatus,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            }
+        } else {
+            // "Compact" the call into a PiP window so the rest of Klic stays usable.
+            if (pip.supported) {
+                Box(Modifier.align(Alignment.TopStart).padding(16.dp)) {
+                    CircleControl(
+                        painter = rememberVectorPainter(Icons.Filled.PictureInPictureAlt),
+                        contentDescription = "Compact call",
+                        diameter = 44,
+                    ) { pip.enter() }
+                }
+            }
+
+            Column(
+                Modifier.fillMaxSize().padding(vertical = 56.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (!hasRemoteVideo) {
+                        AvatarView(
+                            url = peerId?.let { Network.avatarUrl(it) },
+                            name = peerName,
+                            size = 120.dp,
+                        )
+                        Spacer(Modifier.height(16.dp))
+                    }
+                    Text(peerName, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
+                    Text(
+                        callStatus,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CircleControl(
+                        painter = rememberVectorPainter(if (micEnabled) Icons.Filled.Mic else Icons.Filled.MicOff),
+                        contentDescription = "Toggle microphone",
+                    ) { scope.launch { manager.toggleMic() } }
+
+                    CircleControl(
+                        painter = rememberVectorPainter(Icons.Filled.CallEnd),
+                        contentDescription = "End call",
+                        fill = MaterialTheme.colorScheme.error,
+                        tint = MaterialTheme.colorScheme.onError,
+                        diameter = 72,
+                    ) { vm.endCall(); onEnd() }
+
+                    CircleControl(
+                        painter = rememberVectorPainter(if (cameraEnabled) Icons.Filled.Videocam else Icons.Filled.VideocamOff),
+                        contentDescription = "Toggle camera",
+                    ) { scope.launch { manager.toggleCamera() } }
+
+                    if (cameraEnabled) {
+                        CircleControl(
+                            painter = rememberVectorPainter(Icons.Filled.Cameraswitch),
+                            contentDescription = "Switch camera",
+                        ) { manager.switchCamera() }
+                    }
+                }
+            }
+
+            if (shouldShowVideo && cameraEnabled && localVideo != null) {
+                LiveKitVideo(
+                    manager.room, localVideo,
+                    Modifier.padding(20.dp).size(110.dp, 160.dp).clip(RoundedCornerShape(18.dp))
+                        .align(Alignment.TopEnd),
                 )
             }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                CircleControl(
-                    painter = rememberVectorPainter(if (micEnabled) Icons.Filled.Mic else Icons.Filled.MicOff),
-                    contentDescription = "Toggle microphone",
-                ) { scope.launch { manager.toggleMic() } }
-
-                CircleControl(
-                    painter = rememberVectorPainter(Icons.Filled.CallEnd),
-                    contentDescription = "End call",
-                    fill = MaterialTheme.colorScheme.error,
-                    tint = MaterialTheme.colorScheme.onError,
-                    diameter = 72,
-                ) { vm.endCall(); onEnd() }
-
-                CircleControl(
-                    painter = rememberVectorPainter(if (cameraEnabled) Icons.Filled.Videocam else Icons.Filled.VideocamOff),
-                    contentDescription = "Toggle camera",
-                ) { scope.launch { manager.toggleCamera() } }
-
-                if (cameraEnabled) {
-                    CircleControl(
-                        painter = rememberVectorPainter(Icons.Filled.Cameraswitch),
-                        contentDescription = "Switch camera",
-                    ) { manager.switchCamera() }
-                }
-            }
-        }
-
-        if (shouldShowVideo && cameraEnabled && localVideo != null) {
-            LiveKitVideo(
-                manager.room, localVideo,
-                Modifier.padding(20.dp).size(110.dp, 160.dp).clip(RoundedCornerShape(18.dp))
-                    .align(Alignment.TopEnd),
-            )
         }
     }
 }

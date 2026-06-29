@@ -1,8 +1,12 @@
 package com.klicmobile.app
 
 import android.Manifest
+import android.app.PictureInPictureParams
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Bundle
+import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +52,8 @@ import com.klicmobile.app.feature.auth.AuthScreen
 import com.klicmobile.app.feature.auth.WelcomeScreen
 import com.klicmobile.app.feature.call.CallDialScreen
 import com.klicmobile.app.feature.call.CallScreen
+import com.klicmobile.app.feature.call.LocalPipController
+import com.klicmobile.app.feature.call.PipController
 import com.klicmobile.app.feature.chat.ChatScreen
 import com.klicmobile.app.feature.conversations.ConversationsScreen
 import com.klicmobile.app.feature.friends.FriendsScreen
@@ -77,6 +84,11 @@ private val tabRoutes = tabs.map { it.route }.toSet()
 
 class MainActivity : ComponentActivity() {
     private val pendingCall = MutableStateFlow<CallInvite?>(null)
+    private val isInPipMode = mutableStateOf(false)
+    private val pipSupported: Boolean by lazy {
+        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
+            packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+    }
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {}
@@ -122,6 +134,13 @@ class MainActivity : ComponentActivity() {
                     showReliabilityDialog = true
                 }
             }
+            CompositionLocalProvider(
+                LocalPipController provides PipController(
+                    supported = pipSupported,
+                    isInPipMode = isInPipMode.value,
+                    enter = ::enterPipMode,
+                ),
+            ) {
             KlicTheme(isDark = isDark) {
                 // Gate the whole app behind a mandatory update when a newer release exists.
                 // Offline or already on the latest version → proceeds normally.
@@ -160,6 +179,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+            }
         }
     }
 
@@ -172,6 +192,28 @@ class MainActivity : ComponentActivity() {
         if (intent?.action == IncomingCallActivity.ACTION_ACCEPT_CALL) {
             pendingCall.value = CallInvite.fromIntent(intent)
         }
+    }
+
+    // Picture-in-Picture: "compact" the call so the user can keep using Klic during it.
+    private fun enterPipMode() {
+        if (!pipSupported) return
+        runCatching {
+            enterPictureInPictureMode(
+                PictureInPictureParams.Builder().setAspectRatio(Rational(9, 16)).build(),
+            )
+        }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // Auto-compact an active video call when the user navigates away (WhatsApp-style).
+        val cm = (application as KlicApplication).container.callManager
+        if (pipSupported && cm.isConnected.value && cm.cameraEnabled.value) enterPipMode()
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        isInPipMode.value = isInPictureInPictureMode
     }
 
     @Composable
