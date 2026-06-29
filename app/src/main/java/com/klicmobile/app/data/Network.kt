@@ -59,6 +59,9 @@ interface KlicApi {
     @POST("me/devices")
     suspend fun registerDevice(@Body body: Map<String, String>): Response<ResponseBody>
 
+    @POST("diagnostics/mobile-event")
+    suspend fun mobileDiagnostic(@Body body: MobileDiagnosticRequest): Response<ResponseBody>
+
     @POST("calls/{id}/media-joined")
     suspend fun mediaJoined(@Path("id") id: String): Response<ResponseBody>
 

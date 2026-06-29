@@ -271,22 +271,33 @@ class VoiceRecorder(private val context: Context) {
     private val samples = mutableListOf<Float>()
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
-    fun start() {
+    fun start(): Boolean {
+        if (isRecording) return true
         val f = File.createTempFile("voice_", ".m4a", context.cacheDir)
         file = f
         samples.clear()
 
         @Suppress("DEPRECATION")
         val rec = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(context) else MediaRecorder()
-        rec.apply {
-            setAudioSource(MediaRecorder.AudioSource.MIC)
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            setAudioSamplingRate(44_100)
-            setAudioEncodingBitRate(128_000)
-            setOutputFile(f.absolutePath)
-            prepare()
-            start()
+        val started = runCatching {
+            rec.apply {
+                setAudioSource(MediaRecorder.AudioSource.MIC)
+                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                setAudioSamplingRate(44_100)
+                setAudioEncodingBitRate(128_000)
+                setOutputFile(f.absolutePath)
+                prepare()
+                start()
+            }
+        }.isSuccess
+        if (!started) {
+            runCatching { rec.release() }
+            f.delete()
+            file = null
+            isRecording = false
+            elapsed = 0f
+            return false
         }
         recorder = rec
         isRecording = true
@@ -301,6 +312,7 @@ class VoiceRecorder(private val context: Context) {
                 samples.add((amp / 32767f).coerceIn(0f, 1f))
             }
         }
+        return true
     }
 
     /** Returns (audioBytes, durationMs, waveformBytes), or null if too short / failed. */
@@ -309,11 +321,16 @@ class VoiceRecorder(private val context: Context) {
         val rec = recorder ?: run { isRecording = false; return null }
         val f = file ?: run { isRecording = false; return null }
         val durationMs = (elapsed * 1000).toInt()
-        runCatching { rec.stop() }
+        val stopped = runCatching { rec.stop() }.isSuccess
         rec.release()
         recorder = null
+        file = null
         isRecording = false
-        if (elapsed < 0.4f) { f.delete(); return null }
+        if (!stopped || elapsed < 0.4f) {
+            f.delete()
+            samples.clear()
+            return null
+        }
         val bytes = runCatching { f.readBytes() }.getOrNull() ?: run { f.delete(); return null }
         f.delete()
         val waveform = packWaveform(samples.toList())

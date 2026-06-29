@@ -1,6 +1,8 @@
 package com.klicmobile.app.feature.chat
 
 import android.Manifest
+import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -89,7 +91,9 @@ import com.klicmobile.app.data.Message
 import com.klicmobile.app.feature.KlicViewModel
 import com.klicmobile.app.ui.components.AvatarView
 import com.klicmobile.app.ui.theme.KlicIcons
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
@@ -135,14 +139,32 @@ fun ChatScreen(
 
     val recorder = remember { VoiceRecorder(context) }
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) recorder.start()
+        if (granted && !recorder.start()) vm.error.value = "Couldn't start recording."
     }
 
     val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let { /* TODO: upload via vm */ }
+        uri?.let {
+            scope.launch {
+                loadImageDraft(context, it)?.let { draft ->
+                    vm.sendImage(conversation.id, draft.bytes, draft.contentType, draft.width, draft.height)
+                } ?: run {
+                    vm.error.value = "Couldn't read selected photo."
+                }
+            }
+        }
     }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
-        if (success) tempCameraUri?.let { /* TODO: upload via vm */ }
+        val uri = tempCameraUri
+        tempCameraUri = null
+        if (success && uri != null) {
+            scope.launch {
+                loadImageDraft(context, uri)?.let { draft ->
+                    vm.sendImage(conversation.id, draft.bytes, draft.contentType, draft.width, draft.height)
+                } ?: run {
+                    vm.error.value = "Couldn't read captured photo."
+                }
+            }
+        }
     }
     val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { /* TODO: upload via vm */ }
@@ -516,6 +538,27 @@ private fun MessageBubble(
 private fun imageAspect(att: Attachment): Float {
     val w = att.width; val h = att.height
     return if (w != null && h != null && w > 0 && h > 0) (w.toFloat() / h.toFloat()).coerceIn(0.6f, 1.6f) else 1f
+}
+
+private data class ImageDraft(
+    val bytes: ByteArray,
+    val contentType: String,
+    val width: Int?,
+    val height: Int?,
+)
+
+private suspend fun loadImageDraft(context: Context, uri: Uri): ImageDraft? = withContext(Dispatchers.IO) {
+    val resolver = context.contentResolver
+    val bytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: return@withContext null
+    val type = resolver.getType(uri) ?: "image/jpeg"
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+    ImageDraft(
+        bytes = bytes,
+        contentType = type,
+        width = bounds.outWidth.takeIf { it > 0 },
+        height = bounds.outHeight.takeIf { it > 0 },
+    )
 }
 
 // Compact preview text for the composer's reply bar.

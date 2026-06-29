@@ -72,7 +72,9 @@ class AppContainer(app: Application) {
         tokenStore,
     )
     val socket = SocketService()
-    val callManager = CallManager(app)
+    val callManager = CallManager(app) { event, callId, detail ->
+        repository.mobileDiagnostic(event, callId, detail)
+    }
 
     /** Conversation id of the call the user is currently placing/in. The call service reads
      *  this to suppress a duplicate incoming-call screen for that same conversation (glare):

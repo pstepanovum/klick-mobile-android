@@ -57,7 +57,7 @@ fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: ()
 
     LaunchedEffect(call.callId) {
         runCatching {
-            manager.join(call.livekitUrl, call.token, video = isVideo)
+            manager.join(call.callId, call.livekitUrl, call.token, video = isVideo)
         }.onSuccess {
             vm.onCallMediaJoined(call.callId)
         }.onFailure {

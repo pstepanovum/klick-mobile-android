@@ -92,6 +92,12 @@ class KlicRepository(
         runCatching { api.registerDevice(mapOf("platform" to "ANDROID", "pushToken" to pushToken)) }
     }
 
+    suspend fun mobileDiagnostic(event: String, callId: String? = null, detail: String? = null) {
+        runCatching {
+            api.mobileDiagnostic(MobileDiagnosticRequest(event = event, callId = callId, detail = detail))
+        }
+    }
+
     suspend fun endCall(callId: String) { runCatching { api.endCall(callId) } }
     suspend fun mediaJoined(callId: String) { runCatching { api.mediaJoined(callId) } }
     suspend fun declineCall(callId: String) { runCatching { api.declineCall(callId) } }
@@ -130,24 +136,90 @@ class KlicRepository(
         waveform: ByteArray,
     ): Message {
         val contentType = "audio/m4a"
+        diagnostic("upload.voice.presign.start", "bytes=${bytes.size} durationMs=$durationMs")
         val ticket = api.requestUpload(UploadRequest(conversationId, "VOICE", contentType, bytes.size))
+        diagnostic("upload.voice.presign.ok", "bytes=${bytes.size}")
         val request = Request.Builder()
             .url(ticket.uploadUrl)
             .put(bytes.toRequestBody(contentType.toMediaType()))
             .build()
-        uploader.newCall(request).execute().use { resp ->
-            if (!resp.isSuccessful) error("Voice upload failed (${resp.code})")
+        diagnostic("upload.voice.put.start", "bytes=${bytes.size}")
+        runCatching {
+            uploader.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) error("Voice upload failed (${resp.code})")
+            }
+        }.onFailure {
+            diagnostic("upload.voice.put.failed", it.message ?: it::class.java.simpleName)
+            throw it
         }
-        return api.sendMessage(conversationId, SendWithAttachmentsRequest(
-            attachments = listOf(AttachmentInput(
-                key = ticket.key,
-                kind = "VOICE",
-                contentType = contentType,
-                byteSize = bytes.size,
-                durationMs = durationMs,
-                waveform = android.util.Base64.encodeToString(waveform, android.util.Base64.NO_WRAP),
+        diagnostic("upload.voice.put.ok", "bytes=${bytes.size}")
+        diagnostic("upload.voice.message.start")
+        return runCatching {
+            api.sendMessage(conversationId, SendWithAttachmentsRequest(
+                attachments = listOf(AttachmentInput(
+                    key = ticket.key,
+                    kind = "VOICE",
+                    contentType = contentType,
+                    byteSize = bytes.size,
+                    durationMs = durationMs,
+                    waveform = android.util.Base64.encodeToString(waveform, android.util.Base64.NO_WRAP),
+                ))
             ))
-        ))
+        }.onSuccess {
+            diagnostic("upload.voice.message.ok", it.id)
+        }.onFailure {
+            diagnostic("upload.voice.message.failed", it.message ?: it::class.java.simpleName)
+        }.getOrThrow()
+    }
+
+    suspend fun uploadImage(
+        conversationId: String,
+        bytes: ByteArray,
+        contentType: String,
+        width: Int? = null,
+        height: Int? = null,
+    ): Message {
+        val normalizedType = contentType.ifBlank { "image/jpeg" }
+        diagnostic("upload.image.presign.start", "type=$normalizedType bytes=${bytes.size}")
+        val ticket = api.requestUpload(UploadRequest(conversationId, "IMAGE", normalizedType, bytes.size))
+        diagnostic("upload.image.presign.ok", "type=$normalizedType bytes=${bytes.size}")
+        val request = Request.Builder()
+            .url(ticket.uploadUrl)
+            .put(bytes.toRequestBody(normalizedType.toMediaType()))
+            .build()
+        diagnostic("upload.image.put.start", "bytes=${bytes.size}")
+        runCatching {
+            uploader.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) error("Image upload failed (${resp.code})")
+            }
+        }.onFailure {
+            diagnostic("upload.image.put.failed", it.message ?: it::class.java.simpleName)
+            throw it
+        }
+        diagnostic("upload.image.put.ok", "bytes=${bytes.size}")
+        diagnostic("upload.image.message.start")
+        return runCatching {
+            api.sendMessage(conversationId, SendWithAttachmentsRequest(
+                attachments = listOf(AttachmentInput(
+                    key = ticket.key,
+                    kind = "IMAGE",
+                    contentType = normalizedType,
+                    byteSize = bytes.size,
+                    width = width,
+                    height = height,
+                ))
+            ))
+        }.onSuccess {
+            diagnostic("upload.image.message.ok", it.id)
+        }.onFailure {
+            diagnostic("upload.image.message.failed", it.message ?: it::class.java.simpleName)
+        }.getOrThrow()
+    }
+
+    private suspend fun diagnostic(event: String, detail: String? = null) {
+        runCatching {
+            api.mobileDiagnostic(MobileDiagnosticRequest(source = "android", event = event, detail = detail))
+        }
     }
 
     suspend fun startCall(conversationId: String, kind: String): CallSession =

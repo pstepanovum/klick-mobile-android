@@ -293,6 +293,15 @@ class KlicViewModel(
             replyingTo.value = null
             runCatching { repo.uploadVoice(conversationId, bytes, durationMs, waveform) }
                 .onSuccess { upsertMessage(it) }
+                .onFailure { error.value = "Couldn't send voice message. Try again." }
+        }
+
+    fun sendImage(conversationId: String, bytes: ByteArray, contentType: String, width: Int? = null, height: Int? = null) =
+        viewModelScope.launch {
+            replyingTo.value = null
+            runCatching { repo.uploadImage(conversationId, bytes, contentType, width, height) }
+                .onSuccess { upsertMessage(it) }
+                .onFailure { error.value = "Couldn't send photo. Try again." }
         }
 
     fun startCall(conversationId: String, kind: String, peerName: String) = viewModelScope.launch {

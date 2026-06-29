@@ -50,6 +50,14 @@ data class LoginRequest(val username: String, val password: String)
 data class RefreshRequest(val refreshToken: String)
 
 @Serializable
+data class MobileDiagnosticRequest(
+    val source: String = "android",
+    val event: String,
+    val callId: String? = null,
+    val detail: String? = null,
+)
+
+@Serializable
 data class Member(
     val id: String,
     val username: String,
@@ -177,8 +185,11 @@ data class AttachmentInput(
     val kind: String,
     val contentType: String,
     val byteSize: Int,
+    val width: Int? = null,
+    val height: Int? = null,
     val durationMs: Int? = null,
     val waveform: String? = null,
+    val fileName: String? = null,
 )
 
 @Serializable
