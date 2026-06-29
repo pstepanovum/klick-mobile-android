@@ -1,5 +1,7 @@
 package com.klicmobile.app.data
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -73,16 +75,24 @@ class KlicRepository(
         return user
     }
 
+    /** PUT raw bytes to a presigned URL off the main thread; throws on a non-2xx response.
+     *  The blocking OkHttp call MUST run on Dispatchers.IO — callers launch on viewModelScope
+     *  (Main), so executing here directly would crash with NetworkOnMainThreadException. */
+    private suspend fun putToPresignedUrl(uploadUrl: String, bytes: ByteArray, contentType: String, label: String) =
+        withContext(Dispatchers.IO) {
+            val request = Request.Builder()
+                .url(uploadUrl)
+                .put(bytes.toRequestBody(contentType.toMediaType()))
+                .build()
+            uploader.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) error("$label upload failed (${resp.code})")
+            }
+        }
+
     /** Upload new avatar bytes and return the object key to attach via [updateProfile]. */
     suspend fun uploadAvatar(bytes: ByteArray, contentType: String): String {
         val ticket = api.avatarUpload(AvatarUploadRequest(contentType, bytes.size))
-        val request = Request.Builder()
-            .url(ticket.uploadUrl)
-            .put(bytes.toRequestBody(contentType.toMediaType()))
-            .build()
-        uploader.newCall(request).execute().use { resp ->
-            if (!resp.isSuccessful) error("Avatar upload failed (${resp.code})")
-        }
+        putToPresignedUrl(ticket.uploadUrl, bytes, contentType, "Avatar")
         return ticket.key
     }
 
@@ -139,15 +149,9 @@ class KlicRepository(
         diagnostic("upload.voice.presign.start", "bytes=${bytes.size} durationMs=$durationMs")
         val ticket = api.requestUpload(UploadRequest(conversationId, "VOICE", contentType, bytes.size))
         diagnostic("upload.voice.presign.ok", "bytes=${bytes.size}")
-        val request = Request.Builder()
-            .url(ticket.uploadUrl)
-            .put(bytes.toRequestBody(contentType.toMediaType()))
-            .build()
         diagnostic("upload.voice.put.start", "bytes=${bytes.size}")
         runCatching {
-            uploader.newCall(request).execute().use { resp ->
-                if (!resp.isSuccessful) error("Voice upload failed (${resp.code})")
-            }
+            putToPresignedUrl(ticket.uploadUrl, bytes, contentType, "Voice")
         }.onFailure {
             diagnostic("upload.voice.put.failed", it.message ?: it::class.java.simpleName)
             throw it
@@ -183,15 +187,9 @@ class KlicRepository(
         diagnostic("upload.image.presign.start", "type=$normalizedType bytes=${bytes.size}")
         val ticket = api.requestUpload(UploadRequest(conversationId, "IMAGE", normalizedType, bytes.size))
         diagnostic("upload.image.presign.ok", "type=$normalizedType bytes=${bytes.size}")
-        val request = Request.Builder()
-            .url(ticket.uploadUrl)
-            .put(bytes.toRequestBody(normalizedType.toMediaType()))
-            .build()
         diagnostic("upload.image.put.start", "bytes=${bytes.size}")
         runCatching {
-            uploader.newCall(request).execute().use { resp ->
-                if (!resp.isSuccessful) error("Image upload failed (${resp.code})")
-            }
+            putToPresignedUrl(ticket.uploadUrl, bytes, normalizedType, "Image")
         }.onFailure {
             diagnostic("upload.image.put.failed", it.message ?: it::class.java.simpleName)
             throw it

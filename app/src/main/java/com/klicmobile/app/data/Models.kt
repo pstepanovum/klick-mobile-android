@@ -1,5 +1,6 @@
 package com.klicmobile.app.data
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -51,6 +52,10 @@ data class RefreshRequest(val refreshToken: String)
 
 @Serializable
 data class MobileDiagnosticRequest(
+    // Force-encode even though it equals the default: the Json instance uses
+    // encodeDefaults=false, so without this the field is dropped and the server's
+    // own default ("ios") mislabels every Android diagnostic event.
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val source: String = "android",
     val event: String,
     val callId: String? = null,
