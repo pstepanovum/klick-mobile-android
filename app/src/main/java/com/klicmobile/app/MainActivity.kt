@@ -181,11 +181,20 @@ class MainActivity : ComponentActivity() {
         val route = backStack?.destination?.route
         val showBar = route in tabRoutes
 
+        // Navigate to the call UI when a call actually becomes active — not on the button tap.
+        // startCall/acceptIncomingCall are async, so navigating eagerly landed on an empty
+        // active_call that popped straight back (the "double-tap to open the call" bug).
+        val activeCall by vm.activeCall.collectAsState()
+        LaunchedEffect(activeCall?.callId) {
+            if (activeCall?.callId != null) {
+                navController.navigate("active_call") { launchSingleTop = true }
+            }
+        }
+
         val incoming by pendingCall.collectAsState()
         LaunchedEffect(incoming) {
             incoming?.let { invite ->
                 vm.acceptIncomingCall(invite.callId, invite.fromName)
-                navController.navigate("active_call")
                 pendingCall.value = null
             }
         }
@@ -231,7 +240,7 @@ class MainActivity : ComponentActivity() {
                     FriendsScreen(vm) { conversationId -> navController.navigate("profile/$conversationId") }
                 }
                 composable("call") {
-                    CallDialScreen(vm) { navController.navigate("active_call") }
+                    CallDialScreen(vm)
                 }
                 composable("settings") {
                     SettingsScreen(vm, onEditProfile = { navController.navigate("edit_profile") })
@@ -246,7 +255,7 @@ class MainActivity : ComponentActivity() {
                             vm = vm,
                             conversation = convo,
                             onBack = { navController.popBackStack() },
-                            onCall = { navController.navigate("active_call") },
+                            onCall = {}, // navigation is reactive on activeCall (see Home)
                             onOpenProfile = { navController.navigate("profile/${convo.id}") },
                         )
                     }
@@ -257,7 +266,7 @@ class MainActivity : ComponentActivity() {
                         vm = vm,
                         conversationId = id,
                         onBack = { navController.popBackStack() },
-                        onCall = { navController.navigate("active_call") },
+                        onCall = {}, // navigation is reactive on activeCall (see Home)
                         onMessage = {
                             navController.navigate("chat/$id") { popUpTo("home") }
                         },

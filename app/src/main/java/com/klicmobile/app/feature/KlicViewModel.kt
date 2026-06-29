@@ -159,7 +159,7 @@ class KlicViewModel(
         container.themeMode = mode
     }
 
-    fun callFriendDirect(userId: String, kind: String, peerName: String, onStarted: () -> Unit) =
+    fun callFriendDirect(userId: String, kind: String, peerName: String) =
         viewModelScope.launch {
             if (activeCall.value != null) return@launch
             callPeerName.value = peerName
@@ -170,7 +170,6 @@ class KlicViewModel(
             }.onSuccess { (convoId, session) ->
                 container.activeCallConversationId.value = convoId
                 startActiveCall(session, peerName, outgoing = true)
-                onStarted()
             }
         }
 

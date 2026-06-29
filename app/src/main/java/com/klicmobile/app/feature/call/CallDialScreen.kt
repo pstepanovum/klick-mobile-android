@@ -43,7 +43,7 @@ import java.time.Duration
 import java.time.Instant
 
 @Composable
-fun CallDialScreen(vm: KlicViewModel, onCallStarted: () -> Unit) {
+fun CallDialScreen(vm: KlicViewModel) {
     val friends by vm.friends.collectAsState()
     val recents by vm.recentCalls.collectAsState()
     var searchText by remember { mutableStateOf("") }
@@ -79,7 +79,6 @@ fun CallDialScreen(vm: KlicViewModel, onCallStarted: () -> Unit) {
                         RecentCallRow(call) {
                             val name = call.peer?.displayName ?: "Call"
                             vm.startCall(call.conversationId, call.kind, name)
-                            onCallStarted()
                         }
                     }
                     item { SectionHeader("Contacts") }
@@ -98,10 +97,10 @@ fun CallDialScreen(vm: KlicViewModel, onCallStarted: () -> Unit) {
                     FriendCallRow(
                         friend = friend,
                         onAudioCall = {
-                            vm.callFriendDirect(friend.id, "AUDIO", friend.displayName, onCallStarted)
+                            vm.callFriendDirect(friend.id, "AUDIO", friend.displayName)
                         },
                         onVideoCall = {
-                            vm.callFriendDirect(friend.id, "VIDEO", friend.displayName, onCallStarted)
+                            vm.callFriendDirect(friend.id, "VIDEO", friend.displayName)
                         },
                     )
                 }
