@@ -1,6 +1,7 @@
 package com.klicmobile.app.data
 
 import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -50,6 +51,7 @@ data class LoginRequest(val username: String, val password: String)
 @Serializable
 data class RefreshRequest(val refreshToken: String)
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class MobileDiagnosticRequest(
     // Force-encode even though it equals the default: the Json instance uses
