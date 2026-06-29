@@ -132,7 +132,18 @@ fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: ()
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                // Over video the name + status ("Connected") sit on a dark pill with white text so
+                // they stay legible against the remote camera feed; otherwise use theme colors.
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = if (hasPrimaryVideo) {
+                        Modifier.clip(RoundedCornerShape(20.dp))
+                            .background(Color.Black.copy(alpha = 0.35f))
+                            .padding(horizontal = 18.dp, vertical = 8.dp)
+                    } else {
+                        Modifier
+                    },
+                ) {
                     if (!hasPrimaryVideo) {
                         AvatarView(
                             url = peerId?.let { Network.avatarUrl(it) },
@@ -141,10 +152,14 @@ fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: ()
                         )
                         Spacer(Modifier.height(16.dp))
                     }
-                    Text(peerName, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
+                    Text(
+                        peerName,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = if (hasPrimaryVideo) Color.White else MaterialTheme.colorScheme.onBackground,
+                    )
                     Text(
                         callStatus,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (hasPrimaryVideo) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 
