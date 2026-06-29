@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -140,13 +143,13 @@ private fun IncomingCallScreen(callerName: String, isVideo: Boolean, onAccept: (
                 onClick = onDecline,
                 modifier = Modifier.size(72.dp).background(MaterialTheme.colorScheme.error, CircleShape),
             ) {
-                Icon(painterResource(KlicIcons.callEnd), contentDescription = "Decline", tint = MaterialTheme.colorScheme.onError, modifier = Modifier.size(30.dp))
+                Icon(Icons.Filled.CallEnd, contentDescription = "Decline", tint = MaterialTheme.colorScheme.onError, modifier = Modifier.size(30.dp))
             }
             IconButton(
                 onClick = onAccept,
                 modifier = Modifier.size(72.dp).background(Color(0xFF2BD158), CircleShape),
             ) {
-                Icon(painterResource(KlicIcons.phone), contentDescription = "Accept", tint = Color.White, modifier = Modifier.size(30.dp))
+                Icon(Icons.Filled.Call, contentDescription = "Accept", tint = Color.White, modifier = Modifier.size(30.dp))
             }
         }
     }

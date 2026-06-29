@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -33,12 +34,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.EmojiEmotions
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -187,10 +191,10 @@ fun ChatScreen(
                 },
                 actions = {
                     IconButton(onClick = { vm.startCall(conversation.id, "AUDIO", title); onCall("AUDIO") }) {
-                        Icon(painterResource(KlicIcons.phone), contentDescription = "Voice call", modifier = Modifier.size(22.dp))
+                        Icon(Icons.Filled.Call, contentDescription = "Voice call", modifier = Modifier.size(22.dp))
                     }
                     IconButton(onClick = { vm.startCall(conversation.id, "VIDEO", title); onCall("VIDEO") }) {
-                        Icon(painterResource(KlicIcons.video), contentDescription = "Video call", modifier = Modifier.size(22.dp))
+                        Icon(Icons.Filled.Videocam, contentDescription = "Video call", modifier = Modifier.size(24.dp))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
@@ -207,9 +211,10 @@ fun ChatScreen(
                 .fillMaxWidth()
                 .fillMaxHeight(),
         ) {
+            Box(Modifier.weight(1f).fillMaxWidth()) {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)
                     .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } },
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
@@ -242,6 +247,27 @@ fun ChatScreen(
                     }
                 }
             }
+
+            // Scroll-to-latest button (shown when scrolled up); keeps the keyboard open.
+            if (listState.canScrollForward) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 10.dp, bottom = 8.dp)
+                        .size(40.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                        .clickable { scope.launch { listState.animateScrollToItem(maxOf(0, messages.lastIndex)) } },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.KeyboardArrowDown,
+                        contentDescription = "Scroll to latest",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+            } // Box (messages)
 
             if (recorder.isRecording) {
                 RecordingBar(
@@ -483,10 +509,10 @@ private fun imageAspect(att: Attachment): Float {
 private fun messagePreview(m: Message): String = when {
     m.body.isNotBlank() -> m.body
     m.isSticker -> "Sticker"
-    m.attachments.firstOrNull()?.kind == "IMAGE" -> "📷 Photo"
-    m.attachments.firstOrNull()?.kind == "VOICE" -> "🎤 Voice message"
-    m.attachments.firstOrNull()?.kind == "VIDEO" -> "🎥 Video"
-    m.attachments.isNotEmpty() -> "📎 File"
+    m.attachments.firstOrNull()?.kind == "IMAGE" -> "Photo"
+    m.attachments.firstOrNull()?.kind == "VOICE" -> "Voice message"
+    m.attachments.firstOrNull()?.kind == "VIDEO" -> "Video"
+    m.attachments.isNotEmpty() -> "File"
     else -> "Message"
 }
 
@@ -633,44 +659,35 @@ private fun ComposerBar(
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        IconButton(
-            onClick = onAttach,
-            modifier = Modifier.size(44.dp),
-            colors = IconButtonDefaults.iconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor   = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-        ) {
+        IconButton(onClick = onAttach, modifier = Modifier.size(44.dp)) {
             Icon(
                 painter = painterResource(KlicIcons.add),
                 contentDescription = "Attach",
-                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
             )
         }
-        IconButton(
-            onClick = onStickers,
-            modifier = Modifier.size(44.dp),
-            colors = IconButtonDefaults.iconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor   = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-        ) {
+        IconButton(onClick = onStickers, modifier = Modifier.size(44.dp)) {
             Icon(
                 imageVector = Icons.Filled.EmojiEmotions,
                 contentDescription = "Stickers",
-                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp),
             )
         }
         TextField(
             value = draft,
             onValueChange = onChange,
-            modifier = Modifier.weight(1f).focusRequester(focusRequester),
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester)
+                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f), RoundedCornerShape(22.dp)),
             placeholder = { Text("Message", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             maxLines = 4,
             shape = RoundedCornerShape(22.dp),
             colors = TextFieldDefaults.colors(
-                focusedContainerColor      = MaterialTheme.colorScheme.surfaceVariant,
-                unfocusedContainerColor    = MaterialTheme.colorScheme.surfaceVariant,
+                focusedContainerColor      = Color.Transparent,
+                unfocusedContainerColor    = Color.Transparent,
                 focusedIndicatorColor      = Color.Transparent,
                 unfocusedIndicatorColor    = Color.Transparent,
                 disabledIndicatorColor     = Color.Transparent,
@@ -680,18 +697,12 @@ private fun ComposerBar(
         )
 
         val canSend = draft.isNotBlank()
-        IconButton(
-            onClick = if (canSend) onSend else onMic,
-            modifier = Modifier.size(44.dp),
-            colors = IconButtonDefaults.iconButtonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor   = MaterialTheme.colorScheme.onPrimary,
-            ),
-        ) {
+        IconButton(onClick = if (canSend) onSend else onMic, modifier = Modifier.size(44.dp)) {
             Icon(
                 imageVector = if (canSend) Icons.Filled.Send else Icons.Filled.Mic,
                 contentDescription = if (canSend) "Send" else "Record",
-                modifier = Modifier.size(20.dp),
+                tint = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp),
             )
         }
     }
