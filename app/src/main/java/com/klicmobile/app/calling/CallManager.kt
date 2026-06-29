@@ -14,6 +14,7 @@ import io.livekit.android.room.Room
 import io.livekit.android.room.track.LocalVideoTrack
 import io.livekit.android.room.track.Track
 import io.livekit.android.room.track.VideoTrack
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -48,15 +49,46 @@ class CallManager(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var eventsJob: Job? = null
+    private var joinJob: Job? = null
     private var leaving = false
     private var audioHandler: AudioSwitchHandler? = null
     private var currentCallId: String? = null
 
-    suspend fun join(callId: String, url: String, token: String, video: Boolean) {
+    /**
+     * Connect + publish on the manager's own [scope] (not the caller's coroutine) and report the
+     * outcome via callbacks. The connect/publish work must survive the CallScreen composable being
+     * disposed/recomposed — hosting it in CallScreen's `LaunchedEffect` cancelled every in-flight
+     * join the instant the screen left the tree, failing with "The coroutine scope left the
+     * composition" (100% of calls on the Android emulator; a race on real devices).
+     */
+    fun join(
+        callId: String,
+        url: String,
+        token: String,
+        video: Boolean,
+        onJoined: (String) -> Unit,
+        onFailed: (String) -> Unit,
+    ) {
+        // Already joining or connected to this exact call (e.g. a harmless recomposition re-fired
+        // the trigger) — don't tear it down and restart.
+        if (currentCallId == callId && (joinJob?.isActive == true || isConnected.value)) return
         leave()
         currentCallId = callId
         leaving = false
         isReconnecting.value = false
+        joinJob = scope.launch {
+            try {
+                joinInternal(callId, url, token, video)
+                onJoined(callId)
+            } catch (c: CancellationException) {
+                throw c // a real teardown (leave()/hang-up), not a join failure
+            } catch (t: Throwable) {
+                onFailed(callId)
+            }
+        }
+    }
+
+    private suspend fun joinInternal(callId: String, url: String, token: String, video: Boolean) {
         diagnostic("livekit.join.configure", callId, if (video) "video" else "audio")
 
         val handler = createAudioHandler(callId, video).also { audioHandler = it }
@@ -140,6 +172,8 @@ class CallManager(
             micEnabled.value = true
             cameraEnabled.value = video
             refreshTracks()
+        } catch (c: CancellationException) {
+            throw c // hang-up/teardown cancelled the in-flight join — not a real failure
         } catch (t: Throwable) {
             diagnostic("livekit.join.failed", callId, t.message ?: t::class.java.simpleName)
             throw t
@@ -177,6 +211,8 @@ class CallManager(
         leaving = true
         isReconnecting.value = false
         if (hadRoom) diagnostic("livekit.leave.start", callId)
+        joinJob?.cancel()
+        joinJob = null
         eventsJob?.cancel()
         eventsJob = null
         room?.disconnect()

@@ -55,14 +55,14 @@ fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: ()
     val isVideo = call.kind == "VIDEO"
     val shouldShowVideo = cameraEnabled || localVideo != null || remoteVideo != null
 
+    // Trigger the join; the actual connect runs on CallManager's own scope, so it survives this
+    // screen leaving the composition (which used to cancel it mid-connect on the emulator).
     LaunchedEffect(call.callId) {
-        runCatching {
-            manager.join(call.callId, call.livekitUrl, call.token, video = isVideo)
-        }.onSuccess {
-            vm.onCallMediaJoined(call.callId)
-        }.onFailure {
-            vm.onCallJoinFailed(call.callId)
-        }
+        manager.join(
+            call.callId, call.livekitUrl, call.token, video = isVideo,
+            onJoined = { vm.onCallMediaJoined(it) },
+            onFailed = { vm.onCallJoinFailed(it) },
+        )
     }
 
     // Don't let the screen dim/lock while the call UI is up.
