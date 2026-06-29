@@ -15,8 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -34,6 +34,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.klicmobile.app.data.Conversation
+import com.klicmobile.app.data.Message
 import com.klicmobile.app.feature.KlicViewModel
 import com.klicmobile.app.ui.components.AvatarView
 import com.klicmobile.app.ui.components.KlicSearchBar
@@ -94,37 +95,57 @@ fun ConversationsScreen(vm: KlicViewModel, onOpenChat: (Conversation) -> Unit) {
 private fun ConversationRow(conversation: Conversation, online: Boolean, onClick: () -> Unit) {
     val member = conversation.members.firstOrNull()
     val title = member?.displayName ?: "Direct"
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick)
-            .padding(12.dp),
+            .clickable(onClick = onClick),
     ) {
-        androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Box(contentAlignment = Alignment.BottomEnd) {
                 AvatarView(url = member?.avatarUrl, name = title, size = 52.dp)
                 if (online) {
                     Box(
                         Modifier
                             .size(14.dp)
-                            .background(MaterialTheme.colorScheme.surface, CircleShape)
+                            .background(MaterialTheme.colorScheme.background, CircleShape)
                             .padding(2.dp)
                             .background(Color(0xFF22C55E), CircleShape),
                     )
                 }
             }
-            Column(Modifier.padding(start = 14.dp)) {
+            Column(Modifier.padding(start = 14.dp).weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 Text(
-                    conversation.lastMessage?.body ?: "Say hi",
+                    lastMessagePreview(conversation.lastMessage),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
+        // Divider inset to start under the text content, not under the avatar.
+        HorizontalDivider(
+            modifier = Modifier.padding(start = 70.dp),
+            thickness = 1.dp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+        )
     }
+}
+
+/** One-line summary of the last message for the chat list (no emoji, per the design system). */
+private fun lastMessagePreview(m: Message?): String = when {
+    m == null -> "Say hi"
+    m.isDeleted -> "Message deleted"
+    m.isCallEvent -> if (m.call?.isVideo == true) "Video call" else "Voice call"
+    m.isSticker -> "Sticker"
+    m.body.isNotBlank() -> m.body
+    m.attachments.firstOrNull()?.kind == "IMAGE" -> "Photo"
+    m.attachments.firstOrNull()?.kind == "VIDEO" -> "Video"
+    m.attachments.firstOrNull()?.kind == "VOICE" -> "Voice message"
+    m.attachments.isNotEmpty() -> "File"
+    else -> "Say hi"
 }

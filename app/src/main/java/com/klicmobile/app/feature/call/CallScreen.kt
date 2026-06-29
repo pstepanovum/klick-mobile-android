@@ -13,7 +13,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Cameraswitch
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.klicmobile.app.calling.LiveKitVideo
 import com.klicmobile.app.data.CallSession
@@ -36,7 +40,6 @@ import com.klicmobile.app.data.Network
 import com.klicmobile.app.feature.KlicViewModel
 import com.klicmobile.app.ui.components.AvatarView
 import com.klicmobile.app.ui.components.CircleControl
-import com.klicmobile.app.ui.theme.KlicIcons
 import kotlinx.coroutines.launch
 
 @Composable
@@ -97,12 +100,12 @@ fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: ()
 
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
                 CircleControl(
-                    painter = painterResource(if (micEnabled) KlicIcons.mic else KlicIcons.micOff),
+                    painter = rememberVectorPainter(if (micEnabled) Icons.Filled.Mic else Icons.Filled.MicOff),
                     contentDescription = "Toggle microphone",
                 ) { scope.launch { manager.toggleMic() } }
 
                 CircleControl(
-                    painter = painterResource(KlicIcons.callEnd),
+                    painter = rememberVectorPainter(Icons.Filled.CallEnd),
                     contentDescription = "End call",
                     fill = MaterialTheme.colorScheme.error,
                     tint = MaterialTheme.colorScheme.onError,
@@ -110,7 +113,7 @@ fun CallScreen(vm: KlicViewModel, call: CallSession, peerName: String, onEnd: ()
                 ) { vm.endCall(); onEnd() }
 
                 CircleControl(
-                    painter = painterResource(if (cameraEnabled) KlicIcons.camera else KlicIcons.cameraOff),
+                    painter = rememberVectorPainter(if (cameraEnabled) Icons.Filled.Videocam else Icons.Filled.VideocamOff),
                     contentDescription = "Toggle camera",
                 ) { scope.launch { manager.toggleCamera() } }
 
