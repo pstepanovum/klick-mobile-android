@@ -128,11 +128,11 @@ private fun ConversationRow(conversation: Conversation, online: Boolean, onClick
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            // Time (top) + unread count badge (bottom), right-aligned.
+            // Time pinned top-right; unread count badge just beneath it.
             Column(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.padding(start = 8.dp),
+                modifier = Modifier.padding(start = 8.dp).align(Alignment.Top),
             ) {
                 lastMessageTime(conversation.lastMessage)?.let { time ->
                     Text(time, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
