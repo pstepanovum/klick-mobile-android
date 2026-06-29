@@ -59,6 +59,9 @@ class CallManager(
     private var leaving = false
     private var audioHandler: AudioSwitchHandler? = null
     private var ringbackPlayer: MediaPlayer? = null
+    /** Last audio route we applied based on whether any video is on screen — drives automatic
+     *  speaker (video) ↔ earpiece (audio-only) switching as cameras turn on/off mid-call. */
+    private var videoRouteActive = false
     private var currentCallId: String? = null
 
     /**
@@ -158,7 +161,6 @@ class CallManager(
             diagnostic("livekit.join.connect.start", callId)
             room.connect(url, token)
             diagnostic("livekit.join.connect.ok", callId)
-            if (video) preferVideoSpeaker(handler, callId, "after-connect")
 
             diagnostic("livekit.join.mic.start", callId)
             room.localParticipant.setMicrophoneEnabled(true)
@@ -171,7 +173,8 @@ class CallManager(
                 diagnostic("livekit.join.camera.ok", callId)
                 scope.launch {
                     delay(350)
-                    if (currentCallId == callId) preferVideoSpeaker(handler, callId, "settled")
+                    // Re-apply once the speaker device has settled into the available list.
+                    if (currentCallId == callId) updateAudioRouteForVideo(force = true)
                 }
             }
             room.setSpeakerMute(false)
@@ -217,6 +220,7 @@ class CallManager(
         val hadRoom = room != null
         leaving = true
         isReconnecting.value = false
+        videoRouteActive = false
         stopRingback()
         if (hadRoom) diagnostic("livekit.leave.start", callId)
         joinJob?.cancel()
@@ -246,6 +250,7 @@ class CallManager(
             "livekit.tracks.refresh",
             detail = "localVideo=${localVideoTrack.value != null} remoteVideo=${remoteVideoTrack.value != null} remoteAudio=${hasRemoteAudioTrack(r)}",
         )
+        updateAudioRouteForVideo()
     }
 
     private fun createAudioHandler(callId: String, video: Boolean): AudioSwitchHandler =
@@ -319,15 +324,24 @@ class CallManager(
         ringbackPlayer = null
     }
 
-    private fun preferVideoSpeaker(handler: AudioSwitchHandler, callId: String, reason: String) {
+    /** Keep the loudspeaker on whenever any video is on screen, and fall back to the earpiece
+     *  ("regular phone" mode) the moment both sides have their camera off — without a manual
+     *  toggle. Only acts on a change (unless [force]) so a user's manual speaker choice during an
+     *  audio-only stretch isn't overridden until the video state actually flips. A connected
+     *  Bluetooth/wired headset always wins and is never overridden. */
+    private fun updateAudioRouteForVideo(force: Boolean = false) {
+        val videoActive = cameraEnabled.value || localVideoTrack.value != null || remoteVideoTrack.value != null
+        if (!force && videoActive == videoRouteActive) return
+        videoRouteActive = videoActive
+        val handler = audioHandler ?: return
         val devices = handler.availableAudioDevices
-        val hasExternalRoute = devices.any { it is AudioDevice.BluetoothHeadset || it is AudioDevice.WiredHeadset }
-        val speaker = devices.firstOrNull { it is AudioDevice.Speakerphone }
-        if (!hasExternalRoute && speaker != null) {
-            handler.selectDevice(speaker)
-            diagnostic("livekit.audio.route.selectSpeaker", callId, "reason=$reason ${routeDetail(devices, speaker)}")
-        } else {
-            diagnostic("livekit.audio.route.keep", callId, "reason=$reason ${routeDetail(devices, handler.selectedAudioDevice)}")
+        if (devices.any { it is AudioDevice.BluetoothHeadset || it is AudioDevice.WiredHeadset }) return
+        val target = if (videoActive) devices.firstOrNull { it is AudioDevice.Speakerphone }
+                     else devices.firstOrNull { it is AudioDevice.Earpiece }
+        target?.let {
+            handler.selectDevice(it)
+            speakerOn.value = it is AudioDevice.Speakerphone
+            diagnostic("livekit.audio.route.video", currentCallId, "videoActive=$videoActive ${routeDetail(devices, it)}")
         }
     }
 
