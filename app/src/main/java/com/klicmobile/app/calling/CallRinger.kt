@@ -4,11 +4,12 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
-import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import com.klicmobile.app.R
 
 /**
  * Plays a looping ringtone + vibration for an incoming call, honouring the ringer mode
@@ -29,9 +30,8 @@ class CallRinger(private val context: Context) {
     }
 
     private fun startRingtone() {
-        val uri = RingtoneManager.getActualDefaultRingtoneUri(context, RingtoneManager.TYPE_RINGTONE)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-            ?: return
+        // Klic's own bundled ringtone (res/raw/ring.mp3), looped for the duration of the ring.
+        val uri = Uri.parse("android.resource://${context.packageName}/${R.raw.ring}")
         runCatching {
             player = MediaPlayer().apply {
                 setDataSource(context, uri)

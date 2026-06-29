@@ -12,7 +12,9 @@ import com.klicmobile.app.MainActivity
 import com.klicmobile.app.R
 
 object CallNotifications {
-    const val CHANNEL_CALLS = "calls"
+    // Bumped to "calls_v2" so the silent-channel change applies on in-place updates — a channel's
+    // sound can't be changed after creation, only by recreating it under a new id.
+    const val CHANNEL_CALLS = "calls_v2"
     const val CHANNEL_MESSAGES = "messages"
     const val CHANNEL_SERVICE = "service"
     const val INCOMING_CALL_ID = 1001
@@ -32,6 +34,10 @@ object CallNotifications {
             NotificationChannel(CHANNEL_CALLS, "Calls", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "Incoming voice and video calls"
                 setBypassDnd(true)
+                // The incoming-call UI (CallRinger) plays our bundled ringtone, so keep the
+                // notification channel itself silent — otherwise the channel's default sound
+                // would ring on top of it.
+                setSound(null, null)
             }
         )
         nm.createNotificationChannel(
