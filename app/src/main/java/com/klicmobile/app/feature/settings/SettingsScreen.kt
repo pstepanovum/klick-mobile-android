@@ -1,5 +1,7 @@
 package com.klicmobile.app.feature.settings
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -10,18 +12,20 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -36,22 +40,33 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.klicmobile.app.R
 import com.klicmobile.app.calling.CallReliability
 import com.klicmobile.app.feature.KlicViewModel
 import com.klicmobile.app.ui.components.AvatarView
-import com.klicmobile.app.update.AppUpdater
 import com.klicmobile.app.ui.components.KlicLottieView
+import com.klicmobile.app.update.AppUpdater
 import com.klicmobile.app.ui.theme.KlicIcons
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+private sealed class SettingsRoute {
+    object Main : SettingsRoute()
+    object Appearance : SettingsRoute()
+    object AutoNightMode : SettingsRoute()
+    object Updates : SettingsRoute()
+    object Privacy : SettingsRoute()
+}
 
 @Composable
 fun SettingsScreen(vm: KlicViewModel, onEditProfile: () -> Unit = {}) {
@@ -65,166 +80,519 @@ fun SettingsScreen(vm: KlicViewModel, onEditProfile: () -> Unit = {}) {
         catch (e: Exception) { "1.0" }
     }
 
+    var route by remember { mutableStateOf<SettingsRoute>(SettingsRoute.Main) }
+
+    BackHandler(enabled = route != SettingsRoute.Main) {
+        route = when (route) {
+            SettingsRoute.AutoNightMode -> SettingsRoute.Appearance
+            else -> SettingsRoute.Main
+        }
+    }
+
     Box(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.TopCenter,
     ) {
-    Column(
-        Modifier
-            .widthIn(max = 680.dp)
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-    ) {
-        Text(
-            "Settings",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Spacer(Modifier.height(20.dp))
-
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
-                .padding(18.dp),
-        ) {
-            Text(
-                "Appearance",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ThemeChip(label = "Light",  isSelected = themeMode == "light")  { vm.setThemeMode("light") }
-                ThemeChip(label = "Dark",   isSelected = themeMode == "dark")   { vm.setThemeMode("dark") }
-                ThemeChip(label = "System", isSelected = themeMode == "system") { vm.setThemeMode("system") }
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        user?.let {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
-                    .clickable(onClick = onEditProfile)
-                    .padding(18.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AvatarView(url = it.avatarUrl, name = it.displayName, size = 52.dp)
-                Column(Modifier.padding(start = 14.dp).weight(1f)) {
-                    Text(
-                        it.displayName,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    CopyableUsername(username = it.username)
-                }
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-            Spacer(Modifier.height(16.dp))
-
-            // Privacy
+        AnimatedContent(targetState = route, label = "settings_route") { currentRoute ->
             Column(
                 Modifier
+                    .widthIn(max = 680.dp)
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
-                    .padding(18.dp),
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
             ) {
-                Text(
-                    "Privacy",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Last seen", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                when (currentRoute) {
+                    SettingsRoute.Main -> {
                         Text(
-                            "If turned off, you won't see anyone else's last seen.",
+                            "Settings",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        Spacer(Modifier.height(20.dp))
+
+                        // Centered profile header — no card/background
+                        user?.let { u ->
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(
+                                        indication = null,
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        onClick = onEditProfile,
+                                    )
+                                    .padding(vertical = 8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                AvatarView(url = u.avatarUrl, name = u.displayName, size = 80.dp)
+                                Spacer(Modifier.height(10.dp))
+                                Text(
+                                    u.displayName,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    textAlign = TextAlign.Center,
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                CopyableUsername(username = u.username)
+                            }
+                            Spacer(Modifier.height(20.dp))
+                        }
+
+                        // Card 1: My Profile + Appearance
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                                .padding(horizontal = 18.dp),
+                        ) {
+                            SettingsRow(
+                                icon = painterResource(KlicIcons.user),
+                                title = "My Profile",
+                                onClick = onEditProfile,
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                            SettingsRow(
+                                icon = painterResource(R.drawable.ic_line_sun),
+                                title = "Appearance",
+                                onClick = { route = SettingsRoute.Appearance },
+                            )
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // Card 2: Updates
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                                .padding(horizontal = 18.dp),
+                        ) {
+                            SettingsRow(
+                                icon = painterResource(R.drawable.ic_bold_arrow_bottom),
+                                title = "Updates",
+                                onClick = { route = SettingsRoute.Updates },
+                            )
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // Card 3: Privacy
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                                .padding(horizontal = 18.dp),
+                        ) {
+                            SettingsRow(
+                                icon = painterResource(R.drawable.ic_line_lock),
+                                title = "Privacy",
+                                onClick = { route = SettingsRoute.Privacy },
+                            )
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // Reliable calls — battery-optimization exemption (OEM killers) + full-screen intent.
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                                .clickable { CallReliability.requestDisableBatteryOptimization(context) }
+                                .padding(18.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Reliable calls", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                                Text(
+                                    "Allow Klic to run in the background so calls ring on time and don't drop.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // Logout
+                        Button(
+                            onClick = { vm.logout() },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = CircleShape,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                        ) {
+                            Text("Log out", modifier = Modifier.padding(vertical = 6.dp))
+                        }
+
+                        Spacer(Modifier.height(20.dp))
+
+                        KlicLottieView(
+                            name = "07",
+                            modifier = Modifier.fillMaxWidth().height(140.dp),
+                        )
+                        Text(
+                            "Version $versionName",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp),
                         )
                     }
-                    Switch(
-                        checked = showLastSeen,
-                        onCheckedChange = { value ->
-                            showLastSeen = value
-                            vm.setShowLastSeen(value)
-                        },
-                    )
+
+                    SettingsRoute.Appearance -> {
+                        SubScreenHeader(title = "Appearance", onBack = { route = SettingsRoute.Main })
+
+                        // Card 1: Chat Themes — dimmed placeholder
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                                .padding(horizontal = 18.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .alpha(0.4f)
+                                    .padding(vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                            RoundedCornerShape(8.dp),
+                                        ),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_line_gallery),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                                Text(
+                                    "Chat Themes",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // Card 2: Auto-Night Mode — shows current mode label inline
+                        val modeDisplayName = when (themeMode) {
+                            "light" -> "Disabled"
+                            "dark" -> "Dark"
+                            else -> "System"
+                        }
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                                .padding(horizontal = 18.dp),
+                        ) {
+                            SettingsRow(
+                                icon = painterResource(R.drawable.ic_line_moon),
+                                title = "Auto-Night Mode",
+                                onClick = { route = SettingsRoute.AutoNightMode },
+                                trailing = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    ) {
+                                        Text(
+                                            modeDisplayName,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                    }
+
+                    SettingsRoute.AutoNightMode -> {
+                        SubScreenHeader(title = "Auto-Night Mode", onBack = { route = SettingsRoute.Appearance })
+
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                                .padding(horizontal = 18.dp),
+                        ) {
+                            NightModeOption(
+                                title = "System",
+                                subtitle = "Follows Android system setting",
+                                isActive = themeMode == "system",
+                                onClick = { vm.setThemeMode("system") },
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                            NightModeOption(
+                                title = "Disabled",
+                                subtitle = "Always light",
+                                isActive = themeMode == "light",
+                                onClick = { vm.setThemeMode("light") },
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                            NightModeOption(
+                                title = "Scheduled",
+                                subtitle = "Set custom day / night hours",
+                                isActive = themeMode == "system",
+                                onClick = { vm.setThemeMode("system") },
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                            NightModeOption(
+                                title = "Automatic",
+                                subtitle = "Based on ambient light",
+                                isActive = themeMode == "system",
+                                onClick = { vm.setThemeMode("system") },
+                            )
+                        }
+                    }
+
+                    SettingsRoute.Updates -> {
+                        SubScreenHeader(title = "Updates", onBack = { route = SettingsRoute.Main })
+
+                        // App info card
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                                .padding(18.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Icon(
+                                painter = painterResource(KlicIcons.add),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(56.dp),
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                "Klic $versionName",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Manage your updates below",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // Info rows card
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                                .padding(horizontal = 18.dp),
+                        ) {
+                            InfoRow(label = "Version", value = versionName)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                            InfoRow(label = "Platform", value = "Android")
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                            InfoRow(label = "Distribution", value = "GitHub Releases")
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // App updates — check GitHub releases and self-install (no Play Store).
+                        AppUpdateCard(versionName = versionName, scope = scope, context = context)
+
+                        Spacer(Modifier.height(12.dp))
+
+                        Text(
+                            "Updates are delivered via GitHub Releases. iOS users update via TestFlight.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+
+                    SettingsRoute.Privacy -> {
+                        SubScreenHeader(title = "Privacy", onBack = { route = SettingsRoute.Main })
+
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                                .padding(18.dp),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("Last seen", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                                    Text(
+                                        "If turned off, you won't see anyone else's last seen.",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Switch(
+                                    checked = showLastSeen,
+                                    onCheckedChange = { value ->
+                                        showLastSeen = value
+                                        vm.setShowLastSeen(value)
+                                    },
+                                )
+                            }
+                        }
+                    }
                 }
             }
-            Spacer(Modifier.height(10.dp))
         }
+    }
+}
 
-        // Reliable calls — battery-optimization exemption (OEM killers) + full-screen intent.
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
-                .clickable { CallReliability.requestDisableBatteryOptimization(context) }
-                .padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
+@Composable
+private fun SubScreenHeader(title: String, onBack: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface)
+                .clickable(onClick = onBack),
+            contentAlignment = Alignment.Center,
         ) {
-            Column(Modifier.weight(1f)) {
-                Text("Reliable calls", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-                Text(
-                    "Allow Klic to run in the background so calls ring on time and don't drop.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Icon(
+                painter = painterResource(KlicIcons.back),
+                contentDescription = "Back",
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        Text(
+            title,
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(start = 12.dp),
+        )
+    }
+}
+
+@Composable
+private fun SettingsRow(
+    icon: Painter,
+    title: String,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    trailing: @Composable (() -> Unit)? = null,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .background(
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    RoundedCornerShape(8.dp),
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painter = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Text(
+            title,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        if (trailing != null) {
+            trailing()
+        } else {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(20.dp),
             )
         }
-
-        Spacer(Modifier.height(16.dp))
-
-        // App updates — check GitHub releases and self-install (no Play Store).
-        AppUpdateCard(versionName = versionName, scope = scope, context = context)
-
-        Spacer(Modifier.height(16.dp))
-
-        Button(
-            onClick = { vm.logout() },
-            modifier = Modifier.fillMaxWidth(),
-            shape = CircleShape,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-        ) {
-            Text("Log out", modifier = Modifier.padding(vertical = 6.dp))
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        KlicLottieView(
-            name = "07",
-            modifier = Modifier.fillMaxWidth().height(140.dp),
-        )
-        Text(
-            "Version $versionName",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp),
-        )
     }
-    } // Box
+}
+
+@Composable
+private fun NightModeOption(
+    title: String,
+    subtitle: String,
+    isActive: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (isActive) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun InfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 13.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 @Composable
@@ -350,21 +718,5 @@ private fun AppUpdateCard(versionName: String, scope: CoroutineScope, context: a
                 ) { Text("Download & install ${update.versionName}") }
             }
         }
-    }
-}
-
-@Composable
-private fun ThemeChip(label: String, isSelected: Boolean, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        shape = CircleShape,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primary
-                             else MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                           else MaterialTheme.colorScheme.onSurfaceVariant,
-        ),
-    ) {
-        Text(label)
     }
 }
