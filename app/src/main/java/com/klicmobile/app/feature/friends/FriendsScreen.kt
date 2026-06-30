@@ -2,7 +2,6 @@ package com.klicmobile.app.feature.friends
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,22 +9,25 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -47,8 +49,10 @@ import com.klicmobile.app.feature.KlicViewModel
 import com.klicmobile.app.ui.components.AvatarView
 import com.klicmobile.app.ui.components.KlicLottieView
 import com.klicmobile.app.ui.components.KlicTextField
+import com.klicmobile.app.ui.components.PillButton
 import com.klicmobile.app.ui.theme.KlicIcons
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FriendsScreen(
     vm: KlicViewModel,
@@ -57,169 +61,98 @@ fun FriendsScreen(
 ) {
     val friends by vm.friends.collectAsState()
     val requests by vm.friendRequests.collectAsState()
-    val status by vm.friendStatus.collectAsState()
     val presenceMap by vm.presence.collectAsState()
-    var username by remember { mutableStateOf("") }
-    var creatingGroup by remember { mutableStateOf(false) }
-    var groupTitle by remember { mutableStateOf("") }
-    var selectedFriendIds by remember { mutableStateOf(setOf<String>()) }
+    var showAddFriendSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { vm.loadFriends() }
 
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-    LazyColumn(
-        modifier = Modifier
-            .widthIn(max = 680.dp)
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-    ) {
-        item {
-            Text("Add by username", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
-            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                KlicTextField(username, { username = it }, "username", modifier = Modifier.weight(1f))
-                Spacer(Modifier.width(10.dp))
-                IconButton(
-                    onClick = { vm.addFriend(username); username = "" },
-                    modifier = Modifier.size(50.dp),
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
-                ) {
-                    Icon(
-                        painter = painterResource(KlicIcons.addUser),
-                        contentDescription = "Add friend",
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
-            status?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-            }
-            Spacer(Modifier.size(20.dp))
-        }
-
-        item {
-            Text("Create group", style = MaterialTheme.typography.titleMedium)
-            Row(
-                Modifier.fillMaxWidth().padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                KlicTextField(
-                    groupTitle,
-                    { groupTitle = it },
-                    "Group name",
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(
-                    onClick = {
-                        if (creatingGroup && selectedFriendIds.size >= 2 && groupTitle.isNotBlank()) {
-                            vm.createGroupConversation(groupTitle, selectedFriendIds.toList()) { convo ->
-                                creatingGroup = false
-                                groupTitle = ""
-                                selectedFriendIds = emptySet()
-                                onOpenChat(convo)
-                            }
-                        } else {
-                            creatingGroup = !creatingGroup
-                            if (!creatingGroup) selectedFriendIds = emptySet()
-                        }
-                    },
-                    modifier = Modifier.size(50.dp),
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
-                ) {
-                    Icon(
-                        painter = painterResource(if (creatingGroup) KlicIcons.check else KlicIcons.add),
-                        contentDescription = if (creatingGroup) "Create group" else "Select friends",
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
-            Text(
-                if (creatingGroup) {
-                    when {
-                        selectedFriendIds.isEmpty() -> "Select at least two friends below."
-                        selectedFriendIds.size == 1 -> "Select one more friend."
-                        else -> "${selectedFriendIds.size} selected"
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = { Text("Friends", style = MaterialTheme.typography.titleLarge) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                ),
+                actions = {
+                    IconButton(onClick = { showAddFriendSheet = true }) {
+                        Icon(
+                            painter = painterResource(KlicIcons.add),
+                            contentDescription = "Add Friend",
+                            modifier = Modifier.size(22.dp),
+                        )
                     }
-                } else {
-                    "Pick friends and create a shared chat."
                 },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp),
             )
-            Spacer(Modifier.size(20.dp))
-        }
-
-        if (requests.isNotEmpty()) {
-            item { SectionTitle("Requests") }
-            items(requests) { req ->
-                RequestRow(
-                    req,
-                    onAccept  = { vm.acceptRequest(req.requestId) },
-                    onDecline = { vm.declineRequest(req.requestId) },
-                )
-            }
-            item { Spacer(Modifier.size(20.dp)) }
-        }
-
-        item { SectionTitle("Your friends") }
-        if (friends.isEmpty()) {
-            item {
-                Text(
-                    "No friends yet — add someone by username above.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        items(friends) { friend ->
-            val online = presenceMap[friend.id]?.online == true
-            FriendRow(
-                friend = friend,
-                online = online,
-                selectable = creatingGroup,
-                selected = friend.id in selectedFriendIds,
-                onToggleSelected = {
-                    selectedFriendIds =
-                        if (friend.id in selectedFriendIds) selectedFriendIds - friend.id else selectedFriendIds + friend.id
-                },
-            ) {
-                vm.openConversationWith(friend.id) { convo -> onOpenProfile(convo.id) }
-            }
-        }
-        item {
-            Column(
+        },
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            LazyColumn(
                 modifier = Modifier
+                    .widthIn(max = 680.dp)
                     .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                    .padding(horizontal = 20.dp),
             ) {
-                KlicLottieView(
-                    name = "01",
-                    modifier = Modifier.fillMaxWidth().height(180.dp),
-                )
-                Text(
-                    "Your people, all in one place.",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
+                if (requests.isNotEmpty()) {
+                    item { SectionTitle("Requests") }
+                    items(requests) { req ->
+                        RequestRow(
+                            req,
+                            onAccept  = { vm.acceptRequest(req.requestId) },
+                            onDecline = { vm.declineRequest(req.requestId) },
+                        )
+                    }
+                    item { Spacer(Modifier.size(20.dp)) }
+                }
+
+                item { SectionTitle("Your friends") }
+                if (friends.isEmpty()) {
+                    item {
+                        Text(
+                            "No friends yet — tap + to add someone by username.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                items(friends) { friend ->
+                    val online = presenceMap[friend.id]?.online == true
+                    FriendRow(friend = friend, online = online) {
+                        vm.openConversationWith(friend.id) { convo -> onOpenProfile(convo.id) }
+                    }
+                }
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp, bottom = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        KlicLottieView(
+                            name = "01",
+                            modifier = Modifier.fillMaxWidth().height(180.dp),
+                        )
+                        Text(
+                            "Your people, all in one place.",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
+                }
             }
         }
     }
-    } // Box
+
+    if (showAddFriendSheet) {
+        AddFriendSheet(vm = vm, onDismiss = { showAddFriendSheet = false })
+    }
 }
 
 @Composable
@@ -252,7 +185,7 @@ private fun RequestRow(req: FriendRequest, onAccept: () -> Unit, onDecline: () -
         ) {
             Icon(painter = painterResource(KlicIcons.message), contentDescription = "Accept", modifier = Modifier.size(18.dp))
         }
-        Spacer(Modifier.width(8.dp))
+        androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
         IconButton(
             onClick = onDecline,
             modifier = Modifier.size(40.dp),
@@ -268,24 +201,12 @@ private fun RequestRow(req: FriendRequest, onAccept: () -> Unit, onDecline: () -
 
 @Composable
 private fun FriendRow(friend: User, online: Boolean, onClick: () -> Unit) {
-    FriendRow(friend, online, selectable = false, selected = false, onToggleSelected = {}, onClick = onClick)
-}
-
-@Composable
-private fun FriendRow(
-    friend: User,
-    online: Boolean,
-    selectable: Boolean,
-    selected: Boolean,
-    onToggleSelected: () -> Unit,
-    onClick: () -> Unit,
-) {
     Row(
         Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(18.dp))
-            .clickable(onClick = if (selectable) onToggleSelected else onClick)
+            .clickable(onClick = onClick)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -305,15 +226,76 @@ private fun FriendRow(
             Text(friend.displayName, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
             Text("@${friend.username}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (selectable) {
-            Checkbox(checked = selected, onCheckedChange = { onToggleSelected() })
-        } else {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = "View profile",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp),
+        Icon(
+            imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = "View profile",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(22.dp),
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────
+// Add Friend Sheet
+// ─────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddFriendSheet(vm: KlicViewModel, onDismiss: () -> Unit) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val friendStatus by vm.friendStatus.collectAsState()
+    var username by remember { mutableStateOf("") }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        painter = painterResource(KlicIcons.close),
+                        contentDescription = "Close",
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                Text(
+                    "Add Friend",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 4.dp),
+                )
+            }
+            KlicTextField(
+                value = username,
+                onValueChange = { username = it },
+                placeholder = "Username",
+                modifier = Modifier.padding(vertical = 8.dp),
             )
+            Spacer(Modifier.height(12.dp))
+            PillButton(
+                text = "Send Request",
+                onClick = { vm.addFriend(username) },
+            )
+            friendStatus?.let { status ->
+                Text(
+                    status,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            Spacer(Modifier.height(32.dp))
         }
     }
 }

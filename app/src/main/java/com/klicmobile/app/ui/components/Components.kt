@@ -44,11 +44,13 @@ fun PillButton(
     text: String,
     modifier: Modifier = Modifier,
     fill: Color = Color.Unspecified,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val resolvedFill = if (fill == Color.Unspecified) MaterialTheme.colorScheme.primary else fill
     Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.fillMaxWidth(),
         shape = CircleShape,
         colors = ButtonDefaults.buttonColors(
