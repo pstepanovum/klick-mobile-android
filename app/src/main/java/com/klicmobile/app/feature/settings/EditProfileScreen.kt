@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.klicmobile.app.data.ImageUploads
 import com.klicmobile.app.feature.KlicViewModel
 import com.klicmobile.app.ui.components.AvatarView
 import kotlinx.coroutines.Dispatchers
@@ -141,11 +142,10 @@ fun EditProfileScreen(vm: KlicViewModel, onDone: () -> Unit) {
                 onClick = {
                     saving = true
                     scope.launch {
-                        val bytes = withContext(Dispatchers.IO) {
-                            pickedUri?.let { context.contentResolver.openInputStream(it)?.use { s -> s.readBytes() } }
+                        val avatar = withContext(Dispatchers.IO) {
+                            pickedUri?.let { ImageUploads.encodeAvatar(context, it) }
                         }
-                        val contentType = pickedUri?.let { context.contentResolver.getType(it) } ?: "image/jpeg"
-                        vm.saveProfile(displayName.trim(), bytes, if (bytes != null) contentType else null) { onDone() }
+                        vm.saveProfile(displayName.trim(), avatar?.bytes, avatar?.contentType) { onDone() }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
