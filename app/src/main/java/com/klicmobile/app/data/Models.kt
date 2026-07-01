@@ -3,6 +3,7 @@ package com.klicmobile.app.data
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 @Serializable
 data class User(
@@ -205,6 +206,7 @@ data class AttachmentInput(
     val durationMs: Int? = null,
     val waveform: String? = null,
     val fileName: String? = null,
+    @Transient val localBytes: ByteArray? = null,
 )
 
 @Serializable

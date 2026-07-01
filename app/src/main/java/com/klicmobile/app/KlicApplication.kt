@@ -3,9 +3,11 @@ package com.klicmobile.app
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
+import coil.disk.DiskCache
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.SvgDecoder
+import coil.memory.MemoryCache
 import com.klicmobile.app.calling.CallManager
 import com.klicmobile.app.calling.CallNotifications
 import com.klicmobile.app.data.KlicRepository
@@ -52,7 +54,21 @@ class KlicApplication : Application(), ImageLoaderFactory {
 
     // App-wide Coil loader that can decode the SVG sticker pack served from the API.
     override fun newImageLoader(): ImageLoader =
-        ImageLoader.Builder(this).components { add(SvgDecoder.Factory()) }.build()
+        ImageLoader.Builder(this)
+            .components { add(SvgDecoder.Factory()) }
+            .memoryCache {
+                MemoryCache.Builder(this)
+                    .maxSizePercent(0.25)
+                    .build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(cacheDir.resolve("coil_image_cache"))
+                    .maxSizeBytes(256L * 1024 * 1024)
+                    .build()
+            }
+            .crossfade(false)
+            .build()
 }
 
 class AppContainer(app: Application) {

@@ -9,8 +9,23 @@ chat, and call signaling, and to LiveKit for audio/video media.
 
 ## Run
 Open the folder in Android Studio and let Gradle sync, then Run. By default the app targets the
-**live server** `https://api.89.34.230.2.sslip.io` (see `data/Network.kt`). To use a local backend,
-set `BASE_HTTP = "http://10.0.2.2:3000"` (emulator → host) and start `klic-server` first.
+**live server** `https://api.89.34.230.2.sslip.io` (see `data/Network.kt`).
+
+To use a local backend, do not edit source files. Pass a Klic-specific Gradle property:
+
+```bash
+./gradlew :app:installDebug -PKLIC_API_ORIGIN=http://10.0.2.2:4310
+```
+
+In Android Studio, put the same property in your Run Configuration's Gradle task or in
+`~/.gradle/gradle.properties`:
+
+```text
+KLIC_API_ORIGIN=http://10.0.2.2:4310
+```
+
+For a physical Android device over USB, use `adb reverse tcp:4310 tcp:4310` and keep the same app
+property at `http://127.0.0.1:4310`.
 
 CLI: `./gradlew :app:installDebug`
 

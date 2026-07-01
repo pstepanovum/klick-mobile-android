@@ -6,6 +6,7 @@ import com.klicmobile.app.calling.CallManager
 import com.klicmobile.app.calling.CallNotifications
 import com.klicmobile.app.calling.CallRinger
 import com.klicmobile.app.calling.OngoingCallService
+import com.klicmobile.app.data.AttachmentInput
 import com.klicmobile.app.data.CallSession
 import com.klicmobile.app.data.Conversation
 import com.klicmobile.app.data.FriendRequest
@@ -339,6 +340,15 @@ class KlicViewModel(
             runCatching { repo.uploadImage(conversationId, bytes, contentType, width, height) }
                 .onSuccess { upsertMessage(it) }
                 .onFailure { error.value = "Couldn't send photo. Try again." }
+        }
+
+    fun sendAttachments(conversationId: String, body: String?, attachments: List<AttachmentInput>) =
+        viewModelScope.launch {
+            val replyId = replyingTo.value?.id
+            replyingTo.value = null
+            runCatching { repo.uploadAttachments(conversationId, attachments, body?.takeIf { it.isNotBlank() }, replyId) }
+                .onSuccess { upsertMessage(it) }
+                .onFailure { error.value = "Couldn't send attachment. Try again." }
         }
 
     fun startCall(conversationId: String, kind: String, peerName: String) = viewModelScope.launch {

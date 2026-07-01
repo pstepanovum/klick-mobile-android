@@ -75,7 +75,7 @@ fun CallDialScreen(vm: KlicViewModel) {
             LazyColumn(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                 if (searchText.isEmpty() && recents.isNotEmpty()) {
                     item { SectionHeader("Recent") }
-                    items(recents) { call ->
+                    items(recents, key = { it.id }) { call ->
                         RecentCallRow(call) {
                             val name = call.peer?.displayName ?: "Call"
                             vm.startCall(call.conversationId, call.kind, name)
@@ -93,7 +93,7 @@ fun CallDialScreen(vm: KlicViewModel) {
                         )
                     }
                 }
-                items(filtered) { friend ->
+                items(filtered, key = { it.id }) { friend ->
                     FriendCallRow(
                         friend = friend,
                         onAudioCall = {

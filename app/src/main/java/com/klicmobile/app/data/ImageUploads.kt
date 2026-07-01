@@ -13,10 +13,12 @@ import kotlin.math.roundToInt
 data class EncodedImage(
     val bytes: ByteArray,
     val contentType: String,
+    val width: Int,
+    val height: Int,
 )
 
 object ImageUploads {
-    fun encodeAvatar(
+    fun encodeImage(
         context: Context,
         uri: Uri,
         maxDimension: Int = 2048,
@@ -28,10 +30,23 @@ object ImageUploads {
             if (!scaled.compress(Bitmap.CompressFormat.JPEG, quality, out)) return null
             out.toByteArray()
         }
+        val result = EncodedImage(
+            bytes = bytes,
+            contentType = "image/jpeg",
+            width = scaled.width,
+            height = scaled.height,
+        )
         if (scaled !== bitmap) scaled.recycle()
         bitmap.recycle()
-        return EncodedImage(bytes = bytes, contentType = "image/jpeg")
+        return result
     }
+
+    fun encodeAvatar(
+        context: Context,
+        uri: Uri,
+        maxDimension: Int = 2048,
+        quality: Int = 85,
+    ): EncodedImage? = encodeImage(context, uri, maxDimension, quality)
 
     private fun decodeBitmap(resolver: ContentResolver, uri: Uri): Bitmap? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {

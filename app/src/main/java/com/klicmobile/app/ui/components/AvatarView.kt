@@ -13,16 +13,33 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 
 /** Circular avatar that loads a remote image, falling back to the user's initials. */
 @Composable
 fun AvatarView(url: String?, name: String, size: Dp = 40.dp, modifier: Modifier = Modifier) {
     val initials = remember(name) { initialsOf(name) }
+    val context = LocalContext.current
+    val request = remember(url) {
+        url?.let {
+            ImageRequest.Builder(context)
+                .data(it)
+                .memoryCacheKey(it)
+                .diskCacheKey(it)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .networkCachePolicy(CachePolicy.ENABLED)
+                .crossfade(false)
+                .build()
+        }
+    }
     Box(
         modifier = modifier
             .size(size)
@@ -30,11 +47,11 @@ fun AvatarView(url: String?, name: String, size: Dp = 40.dp, modifier: Modifier 
             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
         contentAlignment = Alignment.Center,
     ) {
-        if (url.isNullOrBlank()) {
+        if (request == null) {
             Initials(initials, size)
         } else {
             SubcomposeAsyncImage(
-                model = url,
+                model = request,
                 contentDescription = name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),

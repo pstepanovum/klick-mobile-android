@@ -219,6 +219,47 @@ class KlicRepository(
         }.getOrThrow()
     }
 
+    /** Uploads one or more staged attachments (mixed images/videos/files) and sends them as
+     *  a single message — each attachment is presigned/PUT using its own kind/contentType,
+     *  not hardcoded to "IMAGE" the way the old image-only path was. */
+    suspend fun uploadAttachments(
+        conversationId: String,
+        attachments: List<AttachmentInput>,
+        body: String? = null,
+        replyToId: String? = null,
+    ): Message {
+        require(attachments.isNotEmpty()) { "attachments must not be empty" }
+        val uploaded = mutableListOf<AttachmentInput>()
+        for (attachment in attachments) {
+            val normalizedType = attachment.contentType.ifBlank { "application/octet-stream" }
+            diagnostic("upload.${attachment.kind}.presign.start", "type=$normalizedType bytes=${attachment.byteSize}")
+            val ticket = api.requestUpload(UploadRequest(conversationId, attachment.kind, normalizedType, attachment.byteSize))
+            diagnostic("upload.${attachment.kind}.presign.ok", "type=$normalizedType bytes=${attachment.byteSize}")
+            diagnostic("upload.${attachment.kind}.put.start", "bytes=${attachment.byteSize}")
+            val bytes = requireNotNull(attachment.localBytes) { "AttachmentInput.localBytes required for upload" }
+            runCatching {
+                putToPresignedUrl(ticket.uploadUrl, bytes, normalizedType, attachment.kind)
+            }.onFailure {
+                diagnostic("upload.${attachment.kind}.put.failed", it.message ?: it::class.java.simpleName)
+                throw it
+            }
+            diagnostic("upload.${attachment.kind}.put.ok", "bytes=${attachment.byteSize}")
+            uploaded += attachment.copy(key = ticket.key, localBytes = null)
+        }
+        diagnostic("upload.attachments.message.start")
+        return runCatching {
+            api.sendMessage(conversationId, SendWithAttachmentsRequest(
+                body = body,
+                attachments = uploaded,
+                replyToId = replyToId,
+            ))
+        }.onSuccess {
+            diagnostic("upload.attachments.message.ok", it.id)
+        }.onFailure {
+            diagnostic("upload.attachments.message.failed", it.message ?: it::class.java.simpleName)
+        }.getOrThrow()
+    }
+
     private suspend fun diagnostic(event: String, detail: String? = null) {
         runCatching {
             api.mobileDiagnostic(MobileDiagnosticRequest(source = "android", event = event, detail = detail))

@@ -6,6 +6,11 @@ plugins {
     alias(libs.plugins.google.services)
 }
 
+fun stringBuildConfig(name: String, defaultValue: String): String {
+    val value = (findProperty(name) as String?)?.trim().takeUnless { it.isNullOrEmpty() } ?: defaultValue
+    return "\"$value\""
+}
+
 android {
     namespace = "com.klicmobile.app"
     compileSdk = 35
@@ -16,6 +21,7 @@ android {
         targetSdk = 35
         versionCode = 33
         versionName = "0.4.1"
+        buildConfigField("String", "KLIC_API_ORIGIN", stringBuildConfig("KLIC_API_ORIGIN", "https://api.89.34.230.2.sslip.io"))
     }
 
     buildTypes {

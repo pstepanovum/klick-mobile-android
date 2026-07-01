@@ -1,5 +1,6 @@
 package com.klicmobile.app.data
 
+import com.klicmobile.app.BuildConfig
 import kotlinx.serialization.json.Json
 import okhttp3.Authenticator
 import okhttp3.MediaType.Companion.toMediaType
@@ -136,9 +137,9 @@ private interface AuthApi {
 }
 
 object Network {
-    // Live server (TLS via sslip.io). For local dev use "http://10.0.2.2:3000" (emulator → host).
-    const val BASE_HTTP = "https://api.89.34.230.2.sslip.io"
-    private const val API = "$BASE_HTTP/api/v1/"
+    // Klic-specific host override, usually supplied from Gradle property `KLIC_API_ORIGIN`.
+    val BASE_HTTP = BuildConfig.KLIC_API_ORIGIN
+    private val API = "$BASE_HTTP/api/v1/"
 
     /** Public, stable avatar URL for any user id (404s → UI falls back to initials). */
     fun avatarUrl(userId: String): String = "$BASE_HTTP/api/v1/users/$userId/avatar"
