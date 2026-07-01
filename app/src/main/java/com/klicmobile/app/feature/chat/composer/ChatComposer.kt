@@ -1,4 +1,4 @@
-package com.klicmobile.app.feature.chat
+package com.klicmobile.app.feature.chat.composer
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background

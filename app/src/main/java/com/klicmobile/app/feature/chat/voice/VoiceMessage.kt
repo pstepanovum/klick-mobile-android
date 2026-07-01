@@ -1,4 +1,4 @@
-package com.klicmobile.app.feature.chat
+package com.klicmobile.app.feature.chat.voice
 
 import android.content.Context
 import android.media.AudioAttributes

@@ -1,4 +1,4 @@
-package com.klicmobile.app.feature.chat
+package com.klicmobile.app.feature.chat.actions
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

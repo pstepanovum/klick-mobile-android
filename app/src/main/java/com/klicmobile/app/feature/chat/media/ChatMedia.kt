@@ -1,4 +1,4 @@
-package com.klicmobile.app.feature.chat
+package com.klicmobile.app.feature.chat.media
 
 import android.content.Context
 import android.graphics.Bitmap
