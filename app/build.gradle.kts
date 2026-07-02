@@ -22,6 +22,9 @@ android {
         versionCode = 36
         versionName = "0.4.4"
         buildConfigField("String", "KLIC_API_ORIGIN", stringBuildConfig("KLIC_API_ORIGIN", "https://api.89.34.230.2.sslip.io"))
+        // libsignal's native lib is ~70 MB per ABI — ship arm64 only (every Android
+        // phone since ~2017). Emulator debug installs come from Studio's own build.
+        ndk { abiFilters += "arm64-v8a" }
     }
 
     buildTypes {
@@ -31,6 +34,8 @@ android {
         }
     }
     compileOptions {
+        // libsignal-android requires core library desugaring (java.time et al on minSdk 26)
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -38,6 +43,11 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    packaging {
+        // libsignal ships testing natives + desktop binaries we never load.
+        jniLibs { excludes += "**/libsignal_jni_testing.so" }
+        resources { excludes += listOf("**/*.dylib", "**/*.dll") }
     }
 }
 
@@ -66,6 +76,7 @@ dependencies {
 
     // E2EE — Signal protocol (identity keys + prekeys now; sessions arrive in Phase 2)
     implementation(libs.libsignal.android)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     // Realtime + media
     implementation(libs.socketio.client)

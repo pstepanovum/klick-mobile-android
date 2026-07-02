@@ -10,6 +10,7 @@ import coil.decode.SvgDecoder
 import coil.memory.MemoryCache
 import com.klic.mobile.app.calling.CallManager
 import com.klic.mobile.app.calling.CallNotifications
+import com.klic.mobile.app.data.E2eeKeyManager
 import com.klic.mobile.app.data.KlicRepository
 import com.klic.mobile.app.data.Network
 import com.klic.mobile.app.data.TokenStore

@@ -14,9 +14,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.signal.libsignal.protocol.IdentityKeyPair
-import org.signal.libsignal.protocol.ecc.Curve
+import org.signal.libsignal.protocol.ecc.ECKeyPair
 import org.signal.libsignal.protocol.kem.KEMKeyPair
 import org.signal.libsignal.protocol.kem.KEMKeyType
 import org.signal.libsignal.protocol.state.KyberPreKeyRecord
@@ -113,7 +114,7 @@ class E2eeKeyManager(private val context: Context, private val api: KlicApi) {
         val installId = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
 
-        val signedPair = Curve.generateKeyPair()
+        val signedPair = ECKeyPair.generate()
         val signedRecord = SignedPreKeyRecord(
             1, now, signedPair, identity.privateKey.calculateSignature(signedPair.publicKey.serialize()))
 
@@ -122,7 +123,7 @@ class E2eeKeyManager(private val context: Context, private val api: KlicApi) {
             1, now, kyberLastResortPair,
             identity.privateKey.calculateSignature(kyberLastResortPair.publicKey.serialize()))
 
-        val preKeys = (1..PRE_KEY_BATCH).map { PreKeyRecord(it, Curve.generateKeyPair()) }
+        val preKeys = (1..PRE_KEY_BATCH).map { PreKeyRecord(it, ECKeyPair.generate()) }
         val kyberPreKeys = (1..KYBER_BATCH).map { id ->
             val pair = KEMKeyPair.generate(KEMKeyType.KYBER_1024)
             KyberPreKeyRecord(id, now, pair, identity.privateKey.calculateSignature(pair.publicKey.serialize()))
@@ -216,7 +217,7 @@ class E2eeKeyManager(private val context: Context, private val api: KlicApi) {
 
     private suspend fun topUp(installId: String, identity: IdentityKeyPair, nextPreId: Int, nextKyberId: Int) {
         val now = System.currentTimeMillis()
-        val preKeys = (nextPreId until nextPreId + PRE_KEY_BATCH).map { PreKeyRecord(it, Curve.generateKeyPair()) }
+        val preKeys = (nextPreId until nextPreId + PRE_KEY_BATCH).map { PreKeyRecord(it, ECKeyPair.generate()) }
         val kyberPreKeys = (nextKyberId until nextKyberId + KYBER_BATCH).map { id ->
             val pair = KEMKeyPair.generate(KEMKeyType.KYBER_1024)
             KyberPreKeyRecord(id, now, pair, identity.privateKey.calculateSignature(pair.publicKey.serialize()))
@@ -243,7 +244,7 @@ class E2eeKeyManager(private val context: Context, private val api: KlicApi) {
 
     private suspend fun rotateSignedPreKey(installId: String, identity: IdentityKeyPair, nextId: Int) {
         val now = System.currentTimeMillis()
-        val pair = Curve.generateKeyPair()
+        val pair = ECKeyPair.generate()
         val record = SignedPreKeyRecord(nextId, now, pair,
             identity.privateKey.calculateSignature(pair.publicKey.serialize()))
 
