@@ -12,11 +12,11 @@ fun stringBuildConfig(name: String, defaultValue: String): String {
 }
 
 android {
-    namespace = "com.klicmobile.app"
+    namespace = "com.klic.mobile.app"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.klicmobile.app"
+        applicationId = "com.klic.mobile.app"
         minSdk = 26
         targetSdk = 35
         versionCode = 33

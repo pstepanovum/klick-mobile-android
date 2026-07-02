@@ -7,12 +7,17 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:444745876755:android:edf1b2ff151fb69e9dc6e6",
+        "mobilesdk_app_id": "1:444745876755:android:541c3a2b67a58a9c9dc6e6",
         "android_client_info": {
-          "package_name": "com.klicmobile.app"
+          "package_name": "com.klic.mobile.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "444745876755-7ju3vooupt27va2n2o55p0sgko7sm69k.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyA4M8emF8oUoudOBj0pYSughg-vNKsl8RU"
@@ -20,7 +25,41 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "444745876755-7ju3vooupt27va2n2o55p0sgko7sm69k.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:444745876755:android:edf1b2ff151fb69e9dc6e6",
+        "android_client_info": {
+          "package_name": "com.klicmobile.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "444745876755-7ju3vooupt27va2n2o55p0sgko7sm69k.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA4M8emF8oUoudOBj0pYSughg-vNKsl8RU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "444745876755-7ju3vooupt27va2n2o55p0sgko7sm69k.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
