@@ -78,6 +78,8 @@ dependencies {
     implementation(libs.libsignal.android)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
+    testImplementation(libs.junit)
+
     // Realtime + media
     implementation(libs.socketio.client)
     implementation(libs.livekit.android)
