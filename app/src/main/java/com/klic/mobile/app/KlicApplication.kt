@@ -10,6 +10,7 @@ import coil.decode.SvgDecoder
 import coil.memory.MemoryCache
 import com.klic.mobile.app.calling.CallManager
 import com.klic.mobile.app.calling.CallNotifications
+import com.klic.mobile.app.data.E2eeKeyManager
 import com.klic.mobile.app.data.KlicRepository
 import com.klic.mobile.app.data.Network
 import com.klic.mobile.app.data.TokenStore
@@ -83,10 +84,9 @@ class AppContainer(app: Application) {
     private val _sessionExpired = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val sessionExpired: SharedFlow<Unit> = _sessionExpired
 
-    val repository = KlicRepository(
-        Network.create(tokenStore) { _sessionExpired.tryEmit(Unit) },
-        tokenStore,
-    )
+    private val api = Network.create(tokenStore) { _sessionExpired.tryEmit(Unit) }
+    val repository = KlicRepository(api, tokenStore)
+    val e2eeKeys = E2eeKeyManager(appContext, api)
     val socket = SocketService()
     val callManager = CallManager(app) { event, callId, detail ->
         repository.mobileDiagnostic(event, callId, detail)

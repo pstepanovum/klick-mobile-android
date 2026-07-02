@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- API 31+ backups & device-to-device transfer: never ship the token store off-device
+     (its Keystore key can't follow, so the restored file would be undecryptable anyway). -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="datastore/klic_tokens.preferences_pb" />
+        <exclude domain="file" path="datastore/klic_e2ee.preferences_pb" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="datastore/klic_tokens.preferences_pb" />
+        <exclude domain="file" path="datastore/klic_e2ee.preferences_pb" />
+    </device-transfer>
+</data-extraction-rules>
