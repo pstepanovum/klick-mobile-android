@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- API ≤ 30 backups: never ship the token store off-device (its Keystore key can't follow). -->
+<full-backup-content>
+    <exclude domain="file" path="datastore/klic_tokens.preferences_pb" />
+</full-backup-content>

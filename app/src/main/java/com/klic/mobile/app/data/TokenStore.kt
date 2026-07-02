@@ -15,7 +15,10 @@ import kotlinx.serialization.json.long
 
 private val Context.dataStore by preferencesDataStore(name = "klic_tokens")
 
-/** Persists access + refresh tokens (and the cached user). Swap to EncryptedSharedPreferences before release. */
+/**
+ * Persists access + refresh tokens (and the cached user). Token values are encrypted at rest
+ * with a Keystore-held key ([KeystoreCrypto]); the user cache is non-secret display data.
+ */
 class TokenStore(private val context: Context) {
     private val accessKey = stringPreferencesKey("access")
     private val refreshKey = stringPreferencesKey("refresh")
@@ -31,16 +34,28 @@ class TokenStore(private val context: Context) {
 
     suspend fun load() {
         val prefs = context.dataStore.data.first()
-        cachedAccess = prefs[accessKey]
-        cachedRefresh = prefs[refreshKey]
+        val storedAccess = prefs[accessKey]
+        val storedRefresh = prefs[refreshKey]
+        cachedAccess = storedAccess?.let(KeystoreCrypto::decrypt)
+        cachedRefresh = storedRefresh?.let(KeystoreCrypto::decrypt)
+        // One-time migration: re-save values written before at-rest encryption landed.
+        val access = cachedAccess
+        val refresh = cachedRefresh
+        if (access != null && refresh != null &&
+            (!KeystoreCrypto.isEncrypted(storedAccess!!) || !KeystoreCrypto.isEncrypted(storedRefresh!!))
+        ) {
+            save(access, refresh)
+        }
     }
 
     suspend fun save(access: String, refresh: String) {
         cachedAccess = access
         cachedRefresh = refresh
+        val encAccess = KeystoreCrypto.encrypt(access)
+        val encRefresh = KeystoreCrypto.encrypt(refresh)
         context.dataStore.edit {
-            it[accessKey] = access
-            it[refreshKey] = refresh
+            it[accessKey] = encAccess
+            it[refreshKey] = encRefresh
         }
     }
 
