@@ -39,7 +39,7 @@ CLI: `./gradlew :app:installDebug`
 ## Structure
 
 ```
-app/src/main/java/com/klic/app/
+app/src/main/java/com/klic/mobile/app/
 ├── KlicApplication.kt      # manual DI container (repository, socket, callManager)
 ├── MainActivity.kt         # Compose nav host (auth gate → home → chat → call)
 ├── ui/theme/               # Color, Type (TikTok Sans), Theme (dark)
@@ -70,9 +70,9 @@ drawables (`R.drawable.ic_<variant>_<name>`), then swap the Material icons for t
 - **LiveKit video** is rendered by `calling/CallVideo.kt`.
 
 To make push actually fire:
-1. Create a **Firebase project**, add an Android app with package `com.klic.app`, and replace the
+1. Create a **Firebase project**, add an Android app with package `com.klic.mobile.app`, and replace the
    placeholder **`app/google-services.json`** with the real one.
-2. Put the Firebase **service-account JSON** on the server and set `FCM_SERVICE_ACCOUNT_PATH` in
+2. Put the Firebase **service-account JSON** on the server and set `FCM_CREDENTIALS_PATH` in
    `klic-server/.env`.
 
 LiveKit room/track APIs in `calling/CallManager.kt` + `CallVideo.kt` target the current SDK — adjust
